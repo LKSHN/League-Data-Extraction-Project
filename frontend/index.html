@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>League Data Analysis</title>
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+
+<header>
+  <div class="logo">LEAGUE ANALYSIS</div>
+  <a id="download-btn" class="download-btn" target="_blank">
+    ↓ Get Latest Data
+  </a>
+</header>
+
+<div class="controls-bar">
+  <div class="filter-cascade">
+    <select id="year-select" class="filter-select">
+      <option value="">All years</option>
+    </select>
+    <span class="filter-arrow">›</span>
+    <select id="split-select" class="filter-select" disabled>
+      <option value="">All splits</option>
+    </select>
+    <span class="filter-arrow">›</span>
+    <select id="patch-select" class="filter-select" disabled>
+      <option value="">All patches</option>
+    </select>
+  </div>
+  <nav>
+    <button class="active" data-view="view-details">
+      Champion Details
+    </button>
+    <button data-view="view-games">Games</button>
+  </nav>
+</div>
+
+<main>
+  <div id="view-details" class="view active">
+    <div class="section-title">Champion Details</div>
+    <input class="search-bar" id="search" type="text"
+      placeholder="Search champion…" />
+    <div class="details-layout">
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th data-col="champion">Champion</th>
+              <th data-col="total_games">Games</th>
+              <th data-col="wins">Wins</th>
+              <th data-col="win_rate">Win Rate</th>
+            </tr>
+          </thead>
+          <tbody id="champ-tbody"></tbody>
+        </table>
+      </div>
+      <div id="detail-card" class="detail-card">
+        <div class="empty">Select a champion</div>
+      </div>
+    </div>
+  </div>
+
+  <div id="view-games" class="view">
+    <div class="section-title">Game Results</div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Date</th>
+            <th>Split</th>
+            <th>Patch</th>
+            <th class="team-col">Blue Team</th>
+            <th class="team-col">Red Team</th>
+            <th>Duration</th>
+          </tr>
+        </thead>
+        <tbody id="games-tbody">
+          <tr>
+            <td colspan="6" class="loading">
+              Loading…
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</main>
+
+<script src="/app.js"></script>
+</body>
+</html>

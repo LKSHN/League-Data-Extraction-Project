@@ -1,0 +1,43 @@
+# ── Python ────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# ── Virtual environments ──────────────────────────────────
+.venv/
+venv/
+env/
+ENV/
+
+# ── Downloaded data & generated database ─────────────────
+# CSVs can be hundreds of MB; the DB is rebuilt at startup.
+# Neither should be committed.
+downloads/
+
+# ── Secrets / local config overrides ─────────────────────
+.env
+.env.local
+*.secret
+
+# ── IDEs ─────────────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# ── OS ───────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ── Legacy root files from earlier project iteration ─────
+champion_info.json
+champion_info_2.json
+games.csv
+summoner_spell_info.json
+league_analysis.png
