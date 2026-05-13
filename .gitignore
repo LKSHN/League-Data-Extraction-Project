@@ -24,6 +24,9 @@ downloads/
 .env.local
 *.secret
 
+# ── Claude Code internals ────────────────────────────────
+.claude/
+
 # ── IDEs ─────────────────────────────────────────────────
 .vscode/
 .idea/
