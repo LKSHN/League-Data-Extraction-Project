@@ -1,0 +1,585 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>League Data Analysis</title>
+  <script src="https://d3js.org/d3.v7.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:        #060b14;
+      --panel:     #0d1526;
+      --border:    #1e2d45;
+      --gold:      #c89b3c;
+      --gold-light:#f0c96a;
+      --text:      #c8aa6e;
+      --text-dim:  #6b7a90;
+      --win:       #27ae60;
+      --loss:      #c0392b;
+      --accent:    #1da1c8;
+    }
+
+    html, body { height: 100%; overflow: hidden; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      font-size: 14px;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ── Header ── */
+    header {
+      background: var(--panel);
+      border-bottom: 1px solid var(--border);
+      padding: 0 24px;
+      display: flex;
+      align-items: center;
+      gap: 32px;
+      height: 52px;
+      flex-shrink: 0;
+    }
+
+    .logo {
+      font-size: 17px;
+      font-weight: 700;
+      letter-spacing: 1px;
+      color: var(--gold-light);
+      white-space: nowrap;
+    }
+
+    nav { display: flex; gap: 4px; }
+
+    nav button {
+      background: none;
+      border: none;
+      color: var(--text-dim);
+      padding: 6px 18px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 13px;
+      letter-spacing: 0.5px;
+      transition: color .15s, background .15s;
+    }
+
+    nav button:hover { color: var(--text); background: rgba(200,155,60,.08); }
+    nav button.active { color: var(--gold-light); background: rgba(200,155,60,.15); }
+
+    /* ── Main ── */
+    main {
+      flex: 1;
+      overflow-y: auto;
+      padding: 28px 32px;
+    }
+
+    .view { display: none; }
+    .view.active { display: block; }
+
+    /* ── Section title ── */
+    .section-title {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--gold-light);
+      margin-bottom: 20px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    /* ── Charts ── */
+    .chart-wrap {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 24px;
+      overflow-x: auto;
+    }
+
+    svg text { font-family: 'Segoe UI', system-ui, sans-serif; }
+
+    .bar-bg { fill: #111d2e; }
+    .bar-win { fill: var(--gold); }
+    .bar-played { fill: var(--accent); }
+
+    .axis path, .axis line { stroke: var(--border); }
+    .axis text { fill: var(--text-dim); font-size: 12px; }
+    .y-label { fill: var(--text); font-size: 13px; }
+    .bar-label { fill: var(--text); font-size: 12px; }
+    .grid line { stroke: var(--border); stroke-dasharray: 3,3; }
+    .grid path { stroke: none; }
+
+    .tooltip {
+      position: fixed;
+      background: #101d30;
+      border: 1px solid var(--gold);
+      border-radius: 6px;
+      padding: 10px 14px;
+      pointer-events: none;
+      font-size: 13px;
+      color: var(--text);
+      z-index: 99;
+      opacity: 0;
+      transition: opacity .1s;
+    }
+    .tooltip b { color: var(--gold-light); }
+
+    /* ── Champion Details ── */
+    .details-layout {
+      display: grid;
+      grid-template-columns: 1fr 320px;
+      gap: 20px;
+      align-items: start;
+    }
+
+    .search-bar {
+      width: 100%;
+      margin-bottom: 16px;
+      padding: 8px 14px;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text);
+      font-size: 13px;
+      outline: none;
+      transition: border-color .15s;
+    }
+    .search-bar:focus { border-color: var(--gold); }
+
+    .table-wrap {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      overflow: hidden;
+    }
+
+    table { width: 100%; border-collapse: collapse; }
+
+    thead th {
+      padding: 10px 16px;
+      text-align: left;
+      font-size: 12px;
+      letter-spacing: .6px;
+      color: var(--text-dim);
+      background: #0a1322;
+      border-bottom: 1px solid var(--border);
+      cursor: pointer;
+      user-select: none;
+      white-space: nowrap;
+    }
+    thead th:hover { color: var(--gold-light); }
+    thead th.sort-asc::after  { content: ' ▲'; color: var(--gold); }
+    thead th.sort-desc::after { content: ' ▼'; color: var(--gold); }
+
+    tbody tr {
+      border-bottom: 1px solid var(--border);
+      cursor: pointer;
+      transition: background .1s;
+    }
+    tbody tr:last-child { border-bottom: none; }
+    tbody tr:hover { background: rgba(200,155,60,.06); }
+    tbody tr.selected { background: rgba(200,155,60,.12); }
+
+    td { padding: 9px 16px; font-size: 13px; }
+    td.name { color: var(--text); font-weight: 500; }
+    td.num  { color: var(--text-dim); }
+    td.wr   { font-weight: 600; }
+    td.wr.high { color: var(--win); }
+    td.wr.low  { color: var(--loss); }
+    td.wr.mid  { color: var(--gold); }
+
+    /* ── Detail card ── */
+    .detail-card {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 24px;
+      position: sticky;
+      top: 0;
+    }
+
+    .detail-card .empty {
+      color: var(--text-dim);
+      text-align: center;
+      padding: 40px 0;
+    }
+
+    .detail-name {
+      font-size: 20px;
+      font-weight: 700;
+      color: var(--gold-light);
+      margin-bottom: 18px;
+      padding-bottom: 10px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .stat-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 14px;
+    }
+
+    .stat-label { color: var(--text-dim); font-size: 12px; letter-spacing: .5px; }
+    .stat-value { font-size: 16px; font-weight: 600; color: var(--text); }
+
+    .wr-bar-wrap {
+      margin-top: 20px;
+    }
+    .wr-bar-label {
+      font-size: 11px;
+      color: var(--text-dim);
+      margin-bottom: 6px;
+      letter-spacing: .5px;
+    }
+    .wr-bar-bg {
+      width: 100%;
+      height: 10px;
+      background: var(--loss);
+      border-radius: 5px;
+      overflow: hidden;
+    }
+    .wr-bar-fill {
+      height: 100%;
+      background: var(--win);
+      border-radius: 5px;
+      transition: width .4s ease;
+    }
+    .wr-bar-numbers {
+      display: flex;
+      justify-content: space-between;
+      margin-top: 5px;
+      font-size: 11px;
+    }
+    .wr-bar-numbers .w { color: var(--win); }
+    .wr-bar-numbers .l { color: var(--loss); }
+
+    /* scrollbar */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: var(--bg); }
+    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: var(--gold); }
+
+    .loading {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 200px;
+      color: var(--text-dim);
+      font-size: 15px;
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="logo">LEAGUE ANALYSIS</div>
+  <nav>
+    <button class="active" data-view="view-winrate">Win Rate</button>
+    <button data-view="view-played">Most Played</button>
+    <button data-view="view-details">Champion Details</button>
+  </nav>
+</header>
+
+<main>
+  <!-- Win Rate view -->
+  <div id="view-winrate" class="view active">
+    <div class="section-title">Top 15 Champions by Win Rate</div>
+    <div class="chart-wrap" id="winrate-chart"><div class="loading">Loading data…</div></div>
+  </div>
+
+  <!-- Most Played view -->
+  <div id="view-played" class="view">
+    <div class="section-title">Top 15 Most Played Champions</div>
+    <div class="chart-wrap" id="played-chart"><div class="loading">Loading data…</div></div>
+  </div>
+
+  <!-- Champion Details view -->
+  <div id="view-details" class="view">
+    <div class="section-title">Champion Details</div>
+    <input class="search-bar" id="search" type="text" placeholder="Search champion…" />
+    <div class="details-layout">
+      <div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th data-col="champion">Champion</th>
+                <th data-col="total_games">Games</th>
+                <th data-col="wins">Wins</th>
+                <th data-col="win_rate">Win Rate</th>
+              </tr>
+            </thead>
+            <tbody id="champ-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+      <div id="detail-card" class="detail-card">
+        <div class="empty">Select a champion</div>
+      </div>
+    </div>
+  </div>
+</main>
+
+<div class="tooltip" id="tooltip"></div>
+
+<script>
+  // ── Navigation ──────────────────────────────────────────────────────────
+  const navBtns = document.querySelectorAll('nav button');
+  navBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+      navBtns.forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+      btn.classList.add('active');
+      document.getElementById(btn.dataset.view).classList.add('active');
+    });
+  });
+
+  // ── Tooltip helpers ──────────────────────────────────────────────────────
+  const tooltip = document.getElementById('tooltip');
+  function showTip(html, event) {
+    tooltip.innerHTML = html;
+    tooltip.style.opacity = '1';
+    moveTip(event);
+  }
+  function moveTip(event) {
+    const x = event.clientX + 14;
+    const y = event.clientY - 10;
+    tooltip.style.left = x + 'px';
+    tooltip.style.top  = y + 'px';
+  }
+  function hideTip() { tooltip.style.opacity = '0'; }
+
+  // ── Horizontal bar chart (D3) ─────────────────────────────────────────────
+  function drawBarChart(containerId, data, valueKey, labelFn, colorClass) {
+    const container = document.getElementById(containerId);
+    container.innerHTML = '';
+
+    const margin = { top: 10, right: 80, bottom: 36, left: 140 };
+    const totalW  = Math.max(container.clientWidth - 2, 600);
+    const barH    = 28;
+    const gap     = 8;
+    const chartH  = data.length * (barH + gap);
+    const W       = totalW - margin.left - margin.right;
+    const H       = chartH;
+
+    const maxVal  = valueKey === 'win_rate' ? 100 : d3.max(data, d => d[valueKey]) * 1.1;
+
+    const svg = d3.select(`#${containerId}`).append('svg')
+      .attr('width',  totalW)
+      .attr('height', H + margin.top + margin.bottom);
+
+    const g = svg.append('g')
+      .attr('transform', `translate(${margin.left},${margin.top})`);
+
+    const x = d3.scaleLinear().domain([0, maxVal]).range([0, W]);
+    const y = d3.scaleBand()
+      .domain(data.map(d => d.champion))
+      .range([0, H])
+      .padding(0.25);
+
+    // Grid
+    g.append('g')
+      .attr('class', 'grid')
+      .attr('transform', `translate(0,${H})`)
+      .call(d3.axisBottom(x).ticks(6).tickSize(-H).tickFormat(''));
+
+    // Background bars
+    g.selectAll('.bar-bg')
+      .data(data).enter().append('rect')
+      .attr('class', 'bar-bg')
+      .attr('x', 0).attr('y', d => y(d.champion))
+      .attr('width', W).attr('height', y.bandwidth())
+      .attr('rx', 3);
+
+    // Value bars
+    g.selectAll('.bar-val')
+      .data(data).enter().append('rect')
+      .attr('class', colorClass)
+      .attr('x', 0).attr('y', d => y(d.champion))
+      .attr('height', y.bandwidth())
+      .attr('rx', 3)
+      .attr('width', 0)
+      .transition().duration(600).ease(d3.easeCubicOut)
+      .attr('width', d => Math.max(x(d[valueKey]), 4));
+
+    // Labels
+    g.selectAll('.bar-label')
+      .data(data).enter().append('text')
+      .attr('class', 'bar-label')
+      .attr('x', d => x(d[valueKey]) + 6)
+      .attr('y', d => y(d.champion) + y.bandwidth() / 2 + 4)
+      .text(labelFn);
+
+    // Y axis (champion names)
+    g.append('g').attr('class', 'axis')
+      .call(d3.axisLeft(y).tickSize(0))
+      .selectAll('text')
+      .attr('class', 'y-label')
+      .attr('dx', '-8')
+      .style('text-anchor', 'end');
+
+    // X axis
+    g.append('g').attr('class', 'axis')
+      .attr('transform', `translate(0,${H})`)
+      .call(d3.axisBottom(x).ticks(6)
+        .tickFormat(v => valueKey === 'win_rate' ? v + '%' : v));
+
+    // Hover zones
+    g.selectAll('.hover-zone')
+      .data(data).enter().append('rect')
+      .attr('x', 0).attr('y', d => y(d.champion))
+      .attr('width', W).attr('height', y.bandwidth())
+      .attr('fill', 'transparent')
+      .on('mousemove', (event, d) => {
+        showTip(
+          `<b>${d.champion}</b><br>` +
+          `Win rate: <b>${d.win_rate}%</b><br>` +
+          `Games: ${d.total_games} &nbsp;|&nbsp; Wins: ${d.wins}`,
+          event
+        );
+      })
+      .on('mouseleave', hideTip);
+  }
+
+  // ── Champion details table ────────────────────────────────────────────────
+  let allData = [];
+  let sortCol = 'win_rate';
+  let sortDir = 'desc';
+  let selectedChamp = null;
+
+  function wrClass(wr) {
+    if (wr >= 55) return 'high';
+    if (wr <= 45) return 'low';
+    return 'mid';
+  }
+
+  function renderTable(data) {
+    const tbody = document.getElementById('champ-tbody');
+    tbody.innerHTML = '';
+    data.forEach(d => {
+      const tr = document.createElement('tr');
+      if (selectedChamp && selectedChamp.champion === d.champion)
+        tr.classList.add('selected');
+      tr.innerHTML = `
+        <td class="name">${d.champion}</td>
+        <td class="num">${d.total_games}</td>
+        <td class="num">${d.wins}</td>
+        <td class="wr ${wrClass(d.win_rate)}">${d.win_rate}%</td>
+      `;
+      tr.addEventListener('click', () => selectChamp(d));
+      tbody.appendChild(tr);
+    });
+  }
+
+  function getFilteredSorted() {
+    const q = document.getElementById('search').value.toLowerCase();
+    let rows = allData.filter(d => d.champion.toLowerCase().includes(q));
+    rows.sort((a, b) => {
+      const av = typeof a[sortCol] === 'string' ? a[sortCol] : +a[sortCol];
+      const bv = typeof b[sortCol] === 'string' ? b[sortCol] : +b[sortCol];
+      if (av < bv) return sortDir === 'asc' ? -1 : 1;
+      if (av > bv) return sortDir === 'asc' ?  1 : -1;
+      return 0;
+    });
+    return rows;
+  }
+
+  function selectChamp(d) {
+    selectedChamp = d;
+    renderTable(getFilteredSorted());
+    const card = document.getElementById('detail-card');
+    const winPct = d.win_rate;
+    const losses = d.total_games - d.wins;
+    card.innerHTML = `
+      <div class="detail-name">${d.champion}</div>
+      <div class="stat-row">
+        <span class="stat-label">GAMES PLAYED</span>
+        <span class="stat-value">${d.total_games}</span>
+      </div>
+      <div class="stat-row">
+        <span class="stat-label">WINS</span>
+        <span class="stat-value" style="color:var(--win)">${d.wins}</span>
+      </div>
+      <div class="stat-row">
+        <span class="stat-label">LOSSES</span>
+        <span class="stat-value" style="color:var(--loss)">${losses}</span>
+      </div>
+      <div class="stat-row">
+        <span class="stat-label">WIN RATE</span>
+        <span class="stat-value ${wrClass(winPct)}" style="font-size:22px">${winPct}%</span>
+      </div>
+      <div class="wr-bar-wrap">
+        <div class="wr-bar-label">WIN / LOSS SPLIT</div>
+        <div class="wr-bar-bg">
+          <div class="wr-bar-fill" id="wr-fill" style="width:0%"></div>
+        </div>
+        <div class="wr-bar-numbers">
+          <span class="w">${winPct}% W</span>
+          <span class="l">${d.loss_rate}% L</span>
+        </div>
+      </div>
+    `;
+    setTimeout(() => {
+      const fill = document.getElementById('wr-fill');
+      if (fill) fill.style.width = winPct + '%';
+    }, 20);
+  }
+
+  // Table header sort
+  document.querySelectorAll('thead th[data-col]').forEach(th => {
+    th.addEventListener('click', () => {
+      const col = th.dataset.col;
+      if (sortCol === col) {
+        sortDir = sortDir === 'asc' ? 'desc' : 'asc';
+      } else {
+        sortCol = col;
+        sortDir = col === 'champion' ? 'asc' : 'desc';
+      }
+      document.querySelectorAll('thead th').forEach(h => {
+        h.classList.remove('sort-asc', 'sort-desc');
+      });
+      th.classList.add(sortDir === 'asc' ? 'sort-asc' : 'sort-desc');
+      renderTable(getFilteredSorted());
+    });
+  });
+
+  // Initial sort indicator
+  document.querySelector('thead th[data-col="win_rate"]').classList.add('sort-desc');
+
+  document.getElementById('search').addEventListener('input', () => {
+    renderTable(getFilteredSorted());
+  });
+
+  // ── Bootstrap: load data from Flask API ──────────────────────────────────
+  document.addEventListener('DOMContentLoaded', async () => {
+    const resp = await fetch('/api/data');
+    const data = await resp.json();
+    allData = data;
+
+    const byWinRate = [...data].sort((a, b) => b.win_rate - a.win_rate).slice(0, 15);
+    const byPlayed  = [...data].sort((a, b) => b.total_games - a.total_games).slice(0, 15);
+
+    // Reverse so highest is at top of chart
+    drawBarChart(
+      'winrate-chart',
+      [...byWinRate].reverse(),
+      'win_rate',
+      d => d.win_rate + '%',
+      'bar-win'
+    );
+    drawBarChart(
+      'played-chart',
+      [...byPlayed].reverse(),
+      'total_games',
+      d => d.total_games,
+      'bar-played'
+    );
+
+    renderTable(getFilteredSorted());
+  });
+</script>
+</body>
+</html>
