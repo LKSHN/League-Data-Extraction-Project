@@ -22,6 +22,16 @@ and game results across any league.
 
 ---
 
+## Screenshots
+
+![Champion Details](screenshots/champion-details.png)
+*Champion stats table with win-rate detail card and per-patch trend chart*
+
+![Game Results](screenshots/game-results.png)
+*Game results log with team logos, split, patch, and duration*
+
+---
+
 ## Tech Stack
 
 | Layer | Technology |
