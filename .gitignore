@@ -15,9 +15,10 @@ env/
 ENV/
 
 # ── Downloaded data & generated database ─────────────────
-# CSVs can be hundreds of MB; the DB is rebuilt at startup.
-# Neither should be committed.
-downloads/
+# CSVs can be hundreds of MB — never commit them.
+# The DB is tracked via Git LFS and IS committed.
+downloads/*.csv
+downloads/*.csv.*
 
 # ── Secrets / local config overrides ─────────────────────
 .env

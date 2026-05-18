@@ -145,6 +145,34 @@ def get_patches(db_path, year=None, split=None):
     return [p for p in df['patch'].tolist() if p]
 
 
+def _find_year_csv(downloads_dir, year):
+    """Return the path to the CSV for `year` in downloads_dir, or None."""
+    for fname in os.listdir(downloads_dir):
+        if fname.endswith('.csv') and str(year) in fname:
+            return os.path.join(downloads_dir, fname)
+    return None
+
+
+def update_year(downloads_dir, db_path, year, league=None):
+    """Remove existing data for `year` and reload it from the matching CSV.
+
+    Used by the daily CI job so only the current year is refreshed —
+    no need to re-download or re-process all historical CSVs.
+    """
+    path = _find_year_csv(downloads_dir, year)
+    if not path:
+        raise FileNotFoundError(
+            f'No CSV found for {year} in {downloads_dir}'
+        )
+    conn = sqlite3.connect(db_path)
+    conn.execute(f'DELETE FROM {TABLE}     WHERE year = ?', [year])
+    conn.execute(f'DELETE FROM {SUMMARIES} WHERE year = ?', [year])
+    conn.commit()
+    _load_csv(conn, path, year, league)
+    conn.close()
+    print(f'Updated {year} data in {db_path}')
+
+
 def get_champion_patches(db_path, champion,
                          year=None, split=None):
     """Return per-patch win-rate data for one champion.

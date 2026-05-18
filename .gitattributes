@@ -1,3 +1,7 @@
+# Track the SQLite database with Git LFS.
+# The DB is pre-built locally and committed so Render can serve it
+# without needing the raw CSV files on the host.
+downloads/league_data.db filter=lfs diff=lfs merge=lfs -text
 *.png filter=lfs diff=lfs merge=lfs -text
 *.jpg filter=lfs diff=lfs merge=lfs -text
 *.jpeg filter=lfs diff=lfs merge=lfs -text

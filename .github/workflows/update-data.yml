@@ -1,0 +1,41 @@
+name: Daily data update
+
+on:
+  schedule:
+    - cron: '0 6 * * *'   # 06:00 UTC every day (after OE publishes overnight)
+  workflow_dispatch:        # also allows a manual run from the Actions tab
+
+permissions:
+  contents: write           # needed to commit the updated DB back to the repo
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo (with LFS)
+        uses: actions/checkout@v4
+        with:
+          lfs: true
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Download CSV and update DB
+        env:
+          LOLESPORTS_API_KEY: ${{ secrets.LOLESPORTS_API_KEY }}
+        run: python scripts/update_data.py
+
+      - name: Commit and push updated DB
+        run: |
+          git config user.name  'github-actions[bot]'
+          git config user.email 'github-actions[bot]@users.noreply.github.com'
+          git add downloads/league_data.db
+          git diff --staged --quiet \
+            && echo 'No changes to commit.' \
+            || (git commit -m "chore: update data $(date +%Y-%m-%d)" && git push)

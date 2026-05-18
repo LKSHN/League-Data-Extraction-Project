@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: league-analysis
+    runtime: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: python main.py --server
+    envVars:
+      # Set this in the Render dashboard → Environment tab.
+      # Value: your lolesports API key (same as in your local .env).
+      - key: LOLESPORTS_API_KEY
+        sync: false
