@@ -294,7 +294,7 @@ function _patchRef(lo, hi, x1, x2, yS) {
   const y = yS(50).toFixed(1);
   return `<line x1="${x1}" y1="${y}" x2="${x2}" y2="${y}"
       stroke="#1e2d45" stroke-dasharray="3,3"/>
-    <text x="${x1 - 4}" y="${+y + 4}" text-anchor="end"
+    <text x="${x2 + 4}" y="${+y + 4}" text-anchor="start"
       fill="#6b7a90" font-size="10">50%</text>`;
 }
 
@@ -318,6 +318,27 @@ function _patchDots(patches, xS, yS) {
   }).join('');
 }
 
+// Pick-count bars drawn below the line chart, scaled to max games.
+function _patchBars(patches, xS, yBase, barH) {
+  const maxG = Math.max(...patches.map(p => p.games));
+  const bw   = Math.max(10, Math.min(36,
+    (xS(1) - xS(0)) * 0.5)); // bar width: 50% of gap, clamped
+  return patches.map((p, i) => {
+    const cx   = xS(i);
+    const h    = (p.games / maxG) * barH;
+    const x    = (cx - bw / 2).toFixed(1);
+    const y    = (yBase + barH - h).toFixed(1);
+    // Show count inside bar if tall enough, otherwise above it
+    const lblY = h >= 14
+      ? (yBase + barH - h + 10).toFixed(1)   // inside, near top
+      : (yBase + barH - h - 3).toFixed(1);   // above the bar
+    return `<rect x="${x}" y="${y}" width="${bw.toFixed(1)}" height="${h.toFixed(1)}"
+        fill="#1e2d45" rx="2"/>
+      <text x="${cx.toFixed(1)}" y="${lblY}" text-anchor="middle"
+        fill="#6b7a90" font-size="8">${p.games}</text>`;
+  }).join('');
+}
+
 // Rotates labels 40° when there are more than 5 patches to avoid overlap.
 function _patchXLabels(patches, xS, yBase) {
   const rot  = patches.length > 5 ? -40 : 0;
@@ -333,10 +354,10 @@ function _patchXLabels(patches, xS, yBase) {
 
 function buildPatchChart(patches) {
   if (patches.length < 2) return ''; // need at least 2 points for a meaningful line
-  const ml = 36, mr = 8, mt = 14, ph = 60;
-  const mb = patches.length > 5 ? 44 : 22; // taller bottom margin when labels are rotated
+  const ml = 36, mr = 36, mt = 14, ph = 60, bh = 55; // bh = bar area height
+  const mb = patches.length > 5 ? 52 : 30;
   const W  = 560, pw = W - ml - mr;
-  const H  = mt + ph + mb;
+  const H  = mt + ph + bh + mb;
   // Y range pads ±8 around the actual min/max so dots aren't clipped at the edge.
   const lo = Math.max(0,   Math.min(...patches.map(p => p.win_rate)) - 20);
   const hi = Math.min(100, Math.max(...patches.map(p => p.win_rate)) + 20);
@@ -349,7 +370,8 @@ function buildPatchChart(patches) {
     _patchRef(lo, hi, ml, ml + pw, yS),
     _patchLine(patches, xS, yS),
     _patchDots(patches, xS, yS),
-    _patchXLabels(patches, xS, mt + ph),
+    _patchBars(patches, xS, mt + ph + 2, bh - 2),
+    _patchXLabels(patches, xS, mt + ph + bh),
     '</svg></div>',
   ].join('');
 }
