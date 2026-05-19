@@ -31,7 +31,7 @@ jobs:
           LOLESPORTS_API_KEY: ${{ secrets.LOLESPORTS_API_KEY }}
         run: python scripts/update_data.py
 
-      - name: Commit and push updated DB
+      - name: Commit and push updated DB to GitHub
         run: |
           git config user.name  'github-actions[bot]'
           git config user.email 'github-actions[bot]@users.noreply.github.com'
@@ -39,3 +39,10 @@ jobs:
           git diff --staged --quiet \
             && echo 'No changes to commit.' \
             || (git commit -m "chore: update data $(date +%Y-%m-%d)" && git push)
+
+      - name: Push updated code and DB to Hugging Face Space
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+        run: |
+          git remote add hf https://LKSHN:${HF_TOKEN}@huggingface.co/spaces/LKSHN/league-dashboard
+          git push hf master:main --force
