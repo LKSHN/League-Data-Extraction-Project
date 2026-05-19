@@ -53,7 +53,8 @@ def main():
             )
         print(f'Server mode: serving existing DB ({DB_PATH})')
     elif args.rebuild or not os.path.exists(DB_PATH):
-        ensure_data(FOLDER_ID, YEAR, DOWNLOADS_DIR)
+        # force=True skips the cache check and re-downloads, overwriting the existing CSV.
+        ensure_data(FOLDER_ID, YEAR, DOWNLOADS_DIR, force=args.rebuild)
         build_db(DOWNLOADS_DIR, DB_PATH, league=LEAGUE)
     else:
         print(f'Using existing DB: {DB_PATH}')

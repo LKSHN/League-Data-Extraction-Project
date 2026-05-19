@@ -11,7 +11,6 @@
 
 import os
 import re
-import webbrowser
 import requests
 import gdown
 from gdown.exceptions import FileURLRetrievalError
@@ -55,12 +54,51 @@ def _scrape_file_id(folder_id, year):
 
 
 def _download_single(file_id, dest, year):
-    """Download a single file by its Drive ID using gdown.
+    """Download a single file by its Drive ID.
 
-    Returns the local path on success, or None if gdown reports a
-    rate-limit error (FileURLRetrievalError).
+    Tries two methods in order:
+      1. Session-based request that follows Drive's virus-scan confirmation
+         page — more reliable than a one-shot URL on popular files.
+      2. gdown as fallback.
+
+    Returns the local path on success, or None on failure.
     """
     out = os.path.join(dest, f'{year}_OraclesElixir.csv')
+    session = requests.Session()
+
+    # Method 1: session-based download.
+    # Drive shows an HTML confirmation page for large files; we parse it
+    # for the confirm token and uuid, then fire the real download request.
+    try:
+        r = session.get(
+            _GDRIVE_DL.format(file_id),
+            headers=_HEADERS,
+            timeout=30,
+        )
+        if 'text/html' in r.headers.get('content-type', ''):
+            confirm = re.search(r'confirm=([0-9A-Za-z_\-]+)', r.text)
+            uuid    = re.search(r'uuid=([0-9A-Za-z_\-]+)',    r.text)
+            params  = f'confirm={confirm.group(1)}' if confirm else 'confirm=t'
+            if uuid:
+                params += f'&uuid={uuid.group(1)}'
+            dl_url = (
+                f'https://drive.usercontent.google.com/download'
+                f'?id={file_id}&export=download&{params}'
+            )
+            r = session.get(dl_url, headers=_HEADERS, stream=True, timeout=120)
+        else:
+            r.raw.decode_content = True
+
+        if r.status_code == 200 and 'text/html' not in r.headers.get('content-type', ''):
+            with open(out, 'wb') as f:
+                for chunk in r.iter_content(chunk_size=32_768):
+                    f.write(chunk)
+            if os.path.exists(out) and os.path.getsize(out) > 10_000:
+                return out
+    except Exception:
+        pass
+
+    # Method 2: gdown fallback.
     try:
         gdown.download(
             url=_GDRIVE_DL.format(file_id),
@@ -69,40 +107,42 @@ def _download_single(file_id, dest, year):
         )
         return out if os.path.exists(out) else None
     except FileURLRetrievalError:
-        # Google Drive blocks automated downloads of popular files.
-        # Signal the caller to fall back to a manual prompt.
+        # Google Drive is actively rate-limiting — signal the caller.
         return None
 
 
 def _prompt_manual(file_id, dest, year):
-    """Open the download URL in the browser and print instructions."""
-    url = _GDRIVE_DL.format(file_id)
+    """Print manual download instructions without opening the browser.
+
+    We intentionally do NOT call webbrowser.open() here — that would send
+    the file to the OS default downloads folder instead of `dest`.
+    """
+    url      = _GDRIVE_DL.format(file_id)
     abs_dest = os.path.abspath(dest)
     print(
         '\nGoogle Drive is rate-limiting automated downloads.\n'
         f'Please download the {year} CSV manually:\n'
         f'  {url}\n'
-        f'Then place the .csv file in:\n'
+        f'Save the file into THIS folder (not your default Downloads):\n'
         f'  {abs_dest}\n'
-        'Re-run the app once the file is there.'
+        'Then re-run the app.'
     )
-    webbrowser.open(url)
 
 
-def ensure_data(folder_id, year, dest='downloads'):
+def ensure_data(folder_id, year, dest='downloads', force=False):
     """Ensure a CSV for `year` exists in `dest`.
 
     Flow:
-      1. Return immediately if a matching CSV is already cached.
+      1. Return immediately if a matching CSV is already cached (unless force=True).
       2. Scrape the Drive folder for the file ID.
-      3. Try an automated gdown download.
-      4. If rate-limited, open the file in the browser and prompt the user.
-      5. If the file ID can't be found at all, open the folder page instead.
+      3. Try an automated download.
+      4. If rate-limited, print manual download instructions.
+      5. If the file ID can't be found at all, print the folder URL.
     """
     os.makedirs(dest, exist_ok=True)
 
     cached = _find_local(dest, year)
-    if cached:
+    if cached and not force:
         print(f'Using cached: {os.path.basename(cached)}')
         return cached
 
@@ -117,10 +157,11 @@ def ensure_data(folder_id, year, dest='downloads'):
         _prompt_manual(file_id, dest, year)
         return None
 
-    print('Could not locate file. Opening folder in browser...')
-    webbrowser.open(_FOLDER_URL.format(folder_id))
     print(
-        f'Download the {year} CSV and place it in:\n'
+        f'Could not locate {year} CSV in the Drive folder.\n'
+        f'Download it manually from:\n'
+        f'  {_FOLDER_URL.format(folder_id)}\n'
+        f'And place the .csv file in:\n'
         f'  {os.path.abspath(dest)}'
     )
     return None
