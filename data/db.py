@@ -173,6 +173,46 @@ def update_year(downloads_dir, db_path, year, league=None):
     print(f'Updated {year} data in {db_path}')
 
 
+def get_champion_avg_stats(db_path, champion,
+                           year=None, split=None, patch=None):
+    """Return average per-game stats for one champion.
+
+    Used to populate the stats grid in the champion detail card.
+    KDA is computed as (kills + assists) / max(deaths, 1) to avoid
+    division by zero on deathless games.
+    """
+    where, params = _build_where(
+        {'champion': champion, 'year': year,
+         'split': split, 'patch': patch}
+    )
+    q = f'''
+        SELECT
+            ROUND(AVG(kills),   2) AS avg_kills,
+            ROUND(AVG(deaths),  2) AS avg_deaths,
+            ROUND(AVG(assists), 2) AS avg_assists,
+            ROUND(AVG(
+                CAST(kills + assists AS FLOAT) / MAX(deaths, 1)
+            ), 2)                  AS kda,
+            ROUND(AVG(dpm),         0) AS dpm,
+            ROUND(AVG(cspm),        2) AS cspm,
+            ROUND(AVG(damageshare) * 100, 1) AS damage_share,
+            ROUND(AVG(goldat15),    0) AS avg_gold15,
+            ROUND(AVG(golddiffat15),0) AS gold_diff15,
+            ROUND(AVG(visionscore), 1) AS vision_score
+        FROM {TABLE}{where}
+    '''
+    with sqlite3.connect(db_path) as conn:
+        row = conn.execute(q, params).fetchone()
+    if not row:
+        return {}
+    keys = [
+        'avg_kills', 'avg_deaths', 'avg_assists', 'kda',
+        'dpm', 'cspm', 'damage_share',
+        'avg_gold15', 'gold_diff15', 'vision_score',
+    ]
+    return {k: v for k, v in zip(keys, row) if v is not None}
+
+
 def get_champion_patches(db_path, champion,
                          year=None, split=None):
     """Return per-patch win-rate data for one champion.

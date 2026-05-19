@@ -74,48 +74,85 @@ function wrClass(wr) {
   return 'mid';
 }
 
-function statRow(label, value, color) {
-  const s = color ? ` style="color:${color}"` : '';
-  return '<div class="stat-row">'
-    + `<span class="stat-label">${label}</span>`
-    + `<span class="stat-value"${s}>${value}</span>`
+function buildStatsGrid(s) {
+  if (!s || !Object.keys(s).length) return '';
+
+  const fmt     = v  => v   != null ? v : '—';
+  const fmtGold = v  => v   != null
+    ? `<span class="${v >= 0 ? 'positive' : 'negative'}">${v >= 0 ? '+' : ''}${Math.round(v).toLocaleString()}</span>`
+    : '—';
+
+  // KDA highlight box
+  const kda = s.kda != null
+    ? `<div class="kda-box">
+        <div class="kda-number">${s.kda}</div>
+        <div class="kda-label">KDA</div>
+        <div class="kda-breakdown">
+          <span class="kda-k">${fmt(s.avg_kills)}</span>
+          <span class="kda-sep"> / </span>
+          <span class="kda-d">${fmt(s.avg_deaths)}</span>
+          <span class="kda-sep"> / </span>
+          <span class="kda-a">${fmt(s.avg_assists)}</span>
+        </div>
+      </div>` : '';
+
+  // Stat rows helper
+  const row = (label, val) =>
+    `<div class="ds-row"><span class="ds-label">${label}</span><span class="ds-value">${val}</span></div>`;
+
+  const combat = '<div class="ds-group">'
+    + '<div class="ds-group-title">COMBAT</div>'
+    + row('DPM',       fmt(s.dpm))
+    + row('DMG SHARE', s.damage_share != null ? s.damage_share + '%' : '—')
+    + row('VISION',    fmt(s.vision_score))
+    + '</div>';
+
+  const economy = '<div class="ds-group">'
+    + '<div class="ds-group-title">ECONOMY</div>'
+    + row('CSPM',      fmt(s.cspm))
+    + row('GOLD @15',  s.avg_gold15  != null ? Math.round(s.avg_gold15).toLocaleString() : '—')
+    + row('DIFF @15',  fmtGold(s.gold_diff15))
+    + '</div>';
+
+  return '<div class="detail-stats">'
+    + kda
+    + '<div class="ds-columns">' + combat + economy + '</div>'
     + '</div>';
 }
 
-function wrRateRow(d) {
-  const cls = wrClass(d.win_rate);
-  return '<div class="stat-row">'
-    + '<span class="stat-label">WIN RATE</span>'
-    + `<span class="stat-value ${cls}"`
-    + ` style="font-size:22px">${d.win_rate}%`
-    + '</span></div>';
-}
-
-function wrBarHTML(d) {
-  return '<div class="wr-bar-wrap">'
-    + '<div class="wr-bar-label">WIN / LOSS SPLIT</div>'
-    + '<div class="wr-bar-bg">'
-    + '<div class="wr-bar-fill" id="wr-fill"'
-    + ' style="width:0%"></div></div>'
-    + '<div class="wr-bar-numbers">'
-    + `<span class="w">${d.win_rate}% W</span>`
-    + `<span class="l">${d.loss_rate}% L</span>`
-    + '</div></div>';
-}
-
 function buildDetailHTML(d) {
-  const losses = d.total_games - d.wins;
-  const img = champImg(d.champion, 'champ-icon-lg');
-  return [
-    `<div class="detail-header">${img}`
-    + `<div class="detail-name">${d.champion}</div></div>`,
-    statRow('GAMES PLAYED', d.total_games),
-    statRow('WINS', d.wins, 'var(--win)'),
-    statRow('LOSSES', losses, 'var(--loss)'),
-    wrRateRow(d),
-    wrBarHTML(d),
-    '<div id="patch-chart"></div>',  // filled asynchronously after card renders
-  ].join('');
+  const losses  = d.total_games - d.wins;
+  const wrCls   = wrClass(d.win_rate);
+  const img     = champImg(d.champion, 'champ-icon-lg');
+
+  return `
+    <div class="detail-header">
+      ${img}
+      <div class="detail-header-info">
+        <div class="detail-name">${d.champion}</div>
+        <div class="detail-record">
+          <span class="rec-w">${d.wins}W</span>
+          <span class="rec-sep"> · </span>
+          <span class="rec-l">${losses}L</span>
+          <span class="rec-sep"> · </span>
+          <span class="rec-g">${d.total_games} games</span>
+        </div>
+      </div>
+      <div class="detail-wr ${wrCls}">${d.win_rate}%</div>
+    </div>
+
+    <div class="wr-bar-bg">
+      <div class="wr-bar-fill" id="wr-fill" style="width:0%"></div>
+    </div>
+    <div class="wr-bar-numbers">
+      <span class="w">${d.win_rate}% W</span>
+      <span class="l">${d.loss_rate}% L</span>
+    </div>
+
+    <div id="stats-grid"></div>
+
+    <div id="patch-chart"></div>
+  `;
 }
 
 // ── Champion table ───────────────────────────────────────
@@ -169,13 +206,21 @@ async function selectChamp(d) {
     const fill = document.getElementById('wr-fill');
     if (fill) fill.style.width = d.win_rate + '%';
   }, 20);
+  const { year, split, patch } = getFilters();
+
   // Fetch per-patch win-rate history and render the trend chart.
-  const { year, split } = getFilters();
-  const url = buildUrl('/api/champion-patches',
+  const patchUrl = buildUrl('/api/champion-patches',
     { champion: d.champion, year, split });
-  const patches = await fetch(url).then(r => r.json());
+  const patches = await fetch(patchUrl).then(r => r.json());
   const chart = document.getElementById('patch-chart');
   if (chart) chart.innerHTML = buildPatchChart(patches);
+
+  // Fetch average stats and render the stats grid.
+  const statsUrl = buildUrl('/api/champion-stats',
+    { champion: d.champion, year, split, patch });
+  const stats = await fetch(statsUrl).then(r => r.json());
+  const grid = document.getElementById('stats-grid');
+  if (grid) grid.innerHTML = buildStatsGrid(stats);
 }
 
 function setupSortHeaders() {
@@ -288,13 +333,13 @@ function _patchXLabels(patches, xS, yBase) {
 
 function buildPatchChart(patches) {
   if (patches.length < 2) return ''; // need at least 2 points for a meaningful line
-  const ml = 36, mr = 8, mt = 20, ph = 90;
-  const mb = patches.length > 5 ? 52 : 28; // taller bottom margin when labels are rotated
-  const W  = 272, pw = W - ml - mr;
+  const ml = 36, mr = 8, mt = 14, ph = 60;
+  const mb = patches.length > 5 ? 44 : 22; // taller bottom margin when labels are rotated
+  const W  = 560, pw = W - ml - mr;
   const H  = mt + ph + mb;
   // Y range pads ±8 around the actual min/max so dots aren't clipped at the edge.
-  const lo = Math.max(0,   Math.min(...patches.map(p => p.win_rate)) - 8);
-  const hi = Math.min(100, Math.max(...patches.map(p => p.win_rate)) + 8);
+  const lo = Math.max(0,   Math.min(...patches.map(p => p.win_rate)) - 20);
+  const hi = Math.min(100, Math.max(...patches.map(p => p.win_rate)) + 20);
   const xS = i  => ml + (i / (patches.length - 1)) * pw;
   const yS = wr => mt + ph * (1 - (wr - lo) / (hi - lo));
   return [

@@ -23,7 +23,11 @@ _SUMMARY_COLS = [
 
 
 def load_games(path, league=None):
-    """Return one row per player-game with champion, result, split, patch."""
+    """Return one row per player-game with all available columns.
+
+    All columns are kept so any stat from the CSV can be queried later
+    without needing to rebuild the database.
+    """
     df = pd.read_csv(path, low_memory=False)
     df = df[df['position'] != 'team']   # drop team-summary rows
     if league:
@@ -31,9 +35,7 @@ def load_games(path, league=None):
     for col in ('split', 'patch'):
         if col not in df.columns:       # older CSVs may lack these fields
             df[col] = None
-    return df[['champion', 'result', 'split', 'patch']].dropna(
-        subset=['champion', 'result']
-    )
+    return df.dropna(subset=['champion', 'result'])
 
 
 def _pivot_teams(df):

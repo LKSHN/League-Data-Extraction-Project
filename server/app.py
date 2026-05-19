@@ -10,8 +10,8 @@ import os
 from flask import Flask, jsonify, request, send_from_directory
 
 from data.db import (
-    get_champion_patches, get_games, get_patches,
-    get_splits, get_stats, get_years,
+    get_champion_avg_stats, get_champion_patches,
+    get_games, get_patches, get_splits, get_stats, get_years,
 )
 from data.teams import fetch_team_logos
 from server.config import FOLDER_ID, LEAGUE
@@ -60,6 +60,21 @@ def create_app(db_path):
     def api_splits():
         year = request.args.get('year', type=int)
         return jsonify(get_splits(db_path, year=year))
+
+    @app.route('/api/champion-stats')
+    def api_champion_stats():
+        champ = request.args.get('champion')
+        year  = request.args.get('year',  type=int)
+        split = request.args.get('split') or None
+        patch = request.args.get('patch') or None
+        if not champ:
+            return jsonify({})
+        return jsonify(
+            get_champion_avg_stats(
+                db_path, champ,
+                year=year, split=split, patch=patch,
+            )
+        )
 
     @app.route('/api/champion-patches')
     def api_champion_patches():
