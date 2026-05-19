@@ -1,3 +1,12 @@
+---
+title: League Dashboard
+emoji: 🎮
+colorFrom: blue
+colorTo: purple
+sdk: docker
+pinned: false
+---
+
 # League Esports Data Analysis
 
 A local web application that loads Oracle's Elixir match data, stores it in
