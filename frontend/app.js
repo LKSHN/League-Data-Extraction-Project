@@ -412,8 +412,6 @@ async function loadInfo() {
     sel.appendChild(opt);
   });
   if (info.years.length > 0) sel.value = info.years[0];
-  document.getElementById('download-btn').href =
-    info.folder_url;
   // Wire up the cascade: year → split → patch → reload
   sel.addEventListener('change', () =>
     loadSplits(+sel.value || null)
