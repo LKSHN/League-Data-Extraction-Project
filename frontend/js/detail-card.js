@@ -86,7 +86,19 @@ function buildDetailHTML(d) {
     </div>
 
     <div id="stats-grid"></div>
-    <div id="patch-chart"></div>
+
+    <div class="patch-chart-wrap" data-zoom="${chartZoom}">
+      <div class="patch-chart-label">
+        WIN RATE HISTORY
+        <div class="zoom-toggle">
+          <button id="zoom-patch" class="zoom-btn${chartZoom === 'patch' ? ' active' : ''}"
+                  onclick="setChartZoom('patch')">Patch</button>
+          <button id="zoom-split" class="zoom-btn${chartZoom === 'split' ? ' active' : ''}"
+                  onclick="setChartZoom('split')">Split</button>
+        </div>
+      </div>
+      <div id="patch-chart"></div>
+    </div>
   `;
 }
 
@@ -107,17 +119,51 @@ async function selectChamp(d) {
 
   const { year, split, patch } = getFilters();
 
-  // Fetch per-patch win-rate history and render the trend chart.
-  const patchUrl = buildUrl('/api/champion-patches',
-    { champion: d.champion, year, split });
-  const patches = await fetch(patchUrl).then(r => r.json());
-  const chart = document.getElementById('patch-chart');
-  if (chart) chart.innerHTML = buildPatchChart(patches);
-
   // Fetch average stats and render the stats grid.
   const statsUrl = buildUrl('/api/champion-stats',
     { champion: d.champion, year, split, patch });
   const stats = await fetch(statsUrl).then(r => r.json());
   const grid = document.getElementById('stats-grid');
   if (grid) grid.innerHTML = buildStatsGrid(stats);
+
+  // Fetch and render the trend chart for the current zoom level.
+  // Read zoom from the global, but also check the DOM dataset as a fallback.
+  const wrap = document.querySelector('.patch-chart-wrap');
+  const activeZoom = (wrap && wrap.dataset.zoom) || chartZoom || 'patch';
+  await _renderChartForZoom(d.champion, year, split, activeZoom);
+}
+
+// Fetches the correct data endpoint for the given mode and injects the chart.
+// mode is passed explicitly — never read from the global to avoid scoping issues.
+async function _renderChartForZoom(champion, year, split, mode) {
+  const endpoint = mode === 'split'
+    ? '/api/champion-splits'
+    : '/api/champion-patches';
+  const url = buildUrl(endpoint, { champion, year, split });
+  const data = await fetch(url).then(r => r.json());
+  const chart = document.getElementById('patch-chart');
+  if (!chart) return;
+  chart.innerHTML = buildPatchChart(data);
+  // Scroll to the right end so the most recent data is visible on load.
+  const scroller = chart.querySelector('.patch-chart-scroll');
+  if (scroller) scroller.scrollLeft = scroller.scrollWidth;
+}
+
+// Called by the Patch / Split toggle buttons.
+async function setChartZoom(mode) {
+  if (!selectedChamp) return;
+  chartZoom = mode;
+
+  // Flip active class using stable IDs.
+  const pBtn = document.getElementById('zoom-patch');
+  const sBtn = document.getElementById('zoom-split');
+  if (pBtn) pBtn.classList.toggle('active', mode === 'patch');
+  if (sBtn) sBtn.classList.toggle('active', mode === 'split');
+
+  // Store mode on DOM as ground truth so selectChamp can read it back.
+  const wrap = document.querySelector('.patch-chart-wrap');
+  if (wrap) wrap.dataset.zoom = mode;
+
+  const { year, split } = getFilters();
+  await _renderChartForZoom(selectedChamp.champion, year, split, mode);
 }

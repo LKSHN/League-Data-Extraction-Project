@@ -368,6 +368,52 @@ td.wr.mid   { color: var(--gold); }
   color: var(--text-dim);
   letter-spacing: .5px;
   margin-bottom: 4px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.patch-chart-note {
+  font-size: 9px;
+  color: var(--text-dim);
+  opacity: .6;
+  letter-spacing: 0;
+}
+
+/* Horizontal scroll container for the SVG chart */
+.patch-chart-scroll {
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+}
+.patch-chart-scroll > svg {
+  display: block;
+}
+
+/* Zoom toggle: Patch / Split buttons */
+.zoom-toggle {
+  display: flex;
+  gap: 2px;
+}
+.zoom-btn {
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  color: var(--text-dim);
+  font-size: 10px;
+  padding: 2px 8px;
+  cursor: pointer;
+  letter-spacing: .4px;
+  transition: color .15s, background .15s, border-color .15s;
+}
+.zoom-btn:hover {
+  color: var(--text);
+  border-color: var(--gold);
+}
+.zoom-btn.active {
+  color: var(--gold-light);
+  background: rgba(200,155,60,.15);
+  border-color: var(--gold);
 }
 
 /* ── Games table ── */

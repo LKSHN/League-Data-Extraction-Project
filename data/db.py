@@ -213,14 +213,75 @@ def get_champion_avg_stats(db_path, champion,
     return {k: v for k, v in zip(keys, row) if v is not None}
 
 
+def get_champion_splits(db_path, champion, year=None):
+    """Return per-(year, split) win-rate data for one champion.
+
+    Includes ALL (year, split) buckets that exist in the window, not just
+    the ones where the champion was played.  Missing buckets get games=0
+    and win_rate=None so the chart shows 'not picked' markers.
+    """
+    # ── All (year, split) buckets in the window ──────────────
+    all_where, all_params = _build_where({'year': year})
+    q_all = (f'SELECT DISTINCT year, split FROM {SUMMARIES}{all_where}'
+             ' ORDER BY year, split')
+    with sqlite3.connect(db_path) as conn:
+        all_df = pd.read_sql(q_all, conn, params=all_params or None)
+    all_df = all_df.dropna(subset=['split'])
+    all_buckets = [
+        (int(r.year), r.split) for r in all_df.itertuples()
+    ]
+
+    # ── Champion-specific rows ───────────────────────────────
+    where, params = _build_where({'champion': champion, 'year': year})
+    q = f'SELECT year, split, result FROM {TABLE}{where}'
+    with sqlite3.connect(db_path) as conn:
+        df = pd.read_sql(q, conn, params=params or None)
+    df = df.dropna(subset=['split'])
+
+    champ = {}
+    for (yr, split), grp in df.groupby(['year', 'split']):
+        wins  = int(grp['result'].sum())
+        total = len(grp)
+        champ[(int(yr), split)] = {
+            'games':    total,
+            'wins':     wins,
+            'win_rate': round(wins / total * 100, 1),
+        }
+
+    # ── Merge: fill 0 for buckets where champion wasn't played ─
+    rows = []
+    for (yr, split) in all_buckets:
+        label = f'{split} {yr}'
+        played = champ.get((yr, split))
+        if played:
+            rows.append({'patch': label, **played})
+        else:
+            rows.append({'patch': label, 'games': 0,
+                         'wins': 0, 'win_rate': None})
+    return rows
+
+
 def get_champion_patches(db_path, champion,
                          year=None, split=None):
     """Return per-patch win-rate data for one champion.
 
-    Used to power the historical trend chart in the champion detail card.
-    The patch filter is intentionally excluded so the chart always shows
-    the full history within the selected year/split window.
+    Includes ALL patches that occurred in the year/split window, not just
+    the ones where the champion was played.  Patches with no appearances
+    get games=0 and win_rate=None so the chart can render a 'not picked'
+    marker and break the connecting line at those points.
     """
+    # ── All patches in the window ────────────────────────────
+    all_where, all_params = _build_where({'year': year, 'split': split})
+    q_all = (f'SELECT DISTINCT patch FROM {SUMMARIES}{all_where}'
+             ' ORDER BY patch')
+    with sqlite3.connect(db_path) as conn:
+        all_patches = [
+            p for p in
+            pd.read_sql(q_all, conn, params=all_params or None)['patch']
+            if p
+        ]
+
+    # ── Champion-specific rows ───────────────────────────────
     where, params = _build_where(
         {'champion': champion, 'year': year, 'split': split}
     )
@@ -228,17 +289,25 @@ def get_champion_patches(db_path, champion,
     with sqlite3.connect(db_path) as conn:
         df = pd.read_sql(q, conn, params=params or None)
     df = df.dropna(subset=['patch'])
-    if df.empty:
-        return []
-    rows = []
+
+    champ = {}
     for patch, grp in df.groupby('patch'):
         wins  = int(grp['result'].sum())
         total = len(grp)
-        rows.append({
+        champ[patch] = {
             'patch':    patch,
             'games':    total,
             'wins':     wins,
             'win_rate': round(wins / total * 100, 1),
-        })
-    rows.sort(key=lambda r: r['patch'])
+        }
+
+    # ── Merge: fill 0 for patches where champion wasn't played ─
+    rows = []
+    for p in all_patches:
+        rows.append(champ.get(p, {
+            'patch':    p,
+            'games':    0,
+            'wins':     0,
+            'win_rate': None,
+        }))
     return rows
