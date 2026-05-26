@@ -520,6 +520,111 @@ td.game-team.red-side.win::before {
 }
 
 
+/* ── Position badges ── */
+.pos-badge {
+  display: inline-block;
+  padding: 1px 5px;
+  border-radius: 3px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  vertical-align: middle;
+}
+.pos-top { background: rgba(155, 89, 182, .2); color: #c084e0; }
+.pos-jng { background: rgba(39,  174,  96, .2); color: #5dbb7f; }
+.pos-mid { background: rgba(52,  152, 219, .2); color: #5badd6; }
+.pos-bot { background: rgba(241, 196,  15, .2); color: #d4b82a; }
+.pos-sup { background: rgba(29,  161, 200, .2); color: #4abcd9; }
+
+/* ── Champion icon (small square, for team picks/bans grid) ── */
+.champ-icon-sm {
+  width: 28px;
+  height: 28px;
+  border-radius: 4px;
+  object-fit: cover;
+  border: 1px solid var(--border);
+}
+
+/* ── Player champion pool ── */
+.pchamp-section {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+}
+.pchamp-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 6px;
+}
+.pchamp-cell {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 4px 6px;
+  border-radius: 4px;
+  background: rgba(200,155,60,.04);
+  transition: background .1s;
+}
+.pchamp-cell:hover { background: rgba(200,155,60,.10); }
+.pchamp-icon-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.pchamp-name {
+  font-size: 12px;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 90px;
+}
+.pchamp-stats {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  font-size: 11px;
+  flex-shrink: 0;
+}
+
+/* ── Side win rate row (player card) ── */
+.side-wr-row {
+  display: flex;
+  gap: 16px;
+  margin-top: 8px;
+  padding: 6px 8px;
+  background: rgba(200,155,60,.04);
+  border-radius: 6px;
+  border: 1px solid rgba(30,45,69,.8);
+}
+.side-wr-item {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+}
+.side-dot { font-size: 10px; }
+
+/* ── Team section titles (inside detail card) ── */
+.team-section-title {
+  font-size: 9px;
+  letter-spacing: 1.2px;
+  color: var(--text-dim);
+  margin: 10px 0 6px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+}
+
+/* ── Roster rows (clickable) ── */
+.roster-row {
+  cursor: pointer;
+  border-radius: 3px;
+  transition: background .1s;
+}
+.roster-row:hover { background: rgba(200,155,60,.08); }
+
 /* ── Scrollbar ── */
 ::-webkit-scrollbar       { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: var(--bg); }
