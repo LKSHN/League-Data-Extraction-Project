@@ -20,6 +20,7 @@ from data.stats import compute_stats
 
 TABLE     = 'games'           # per-player rows; used for champion stats
 SUMMARIES = 'game_summaries'  # per-game rows;   used for the game-results list
+ITEMS     = 'champion_items'  # aggregated item counts from Leaguepedia
 
 
 def _year_from_filename(path):
@@ -173,6 +174,71 @@ def update_year(downloads_dir, db_path, year, league=None):
     print(f'Updated {year} data in {db_path}')
 
 
+def build_champion_items(db_path, league):
+    """Fetch item data from Leaguepedia and store aggregated pick counts.
+
+    Called once during --rebuild or --items.  Safe to re-run: drops and
+    recreates the champion_items table each time.
+    Returns True on success, False if the API was unavailable.
+    """
+    from data.leaguepedia import fetch_champion_items
+    try:
+        records = fetch_champion_items(league)
+    except Exception as e:
+        print(f'Could not fetch item data from Leaguepedia ({e}).')
+        print('Run  python main.py --items  later to retry.')
+        return False
+    if not records:
+        print('No item data returned from Leaguepedia — skipping.')
+        print('Run  python main.py --items  later to retry.')
+        return False
+
+    # Aggregate: (champion, item_name, year) → total picks
+    counts = {}
+    for champ, item, year in records:
+        key = (champ, item, year)
+        counts[key] = counts.get(key, 0) + 1
+
+    conn = sqlite3.connect(db_path)
+    conn.execute(f'DROP TABLE IF EXISTS {ITEMS}')
+    conn.execute(f'''
+        CREATE TABLE {ITEMS} (
+            champion  TEXT,
+            item_name TEXT,
+            year      INTEGER,
+            picks     INTEGER
+        )
+    ''')
+    conn.executemany(
+        f'INSERT INTO {ITEMS} VALUES (?, ?, ?, ?)',
+        [(c, i, y, n) for (c, i, y), n in counts.items()],
+    )
+    conn.commit()
+    conn.close()
+    print(f'champion_items table built ({len(counts)} rows).')
+    return True
+
+
+def get_champion_items(db_path, champion, year=None, top_n=10):
+    """Return the top_n most-bought items for a champion."""
+    with sqlite3.connect(db_path) as conn:
+        exists = conn.execute(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name=?",
+            [ITEMS],
+        ).fetchone()
+    if not exists:
+        return []
+
+    where, params = _build_where({'champion': champion, 'year': year})
+    q = (f'SELECT item_name, SUM(picks) AS total'
+         f' FROM {ITEMS}{where}'
+         f' GROUP BY item_name ORDER BY total DESC LIMIT {top_n}')
+    with sqlite3.connect(db_path) as conn:
+        df = pd.read_sql(q, conn, params=params or None)
+    return [{'item_name': r['item_name'], 'picks': int(r['total'])}
+            for _, r in df.iterrows()]
+
+
 def get_champion_avg_stats(db_path, champion,
                            year=None, split=None, patch=None):
     """Return average per-game stats for one champion.
@@ -259,6 +325,8 @@ def get_champion_splits(db_path, champion, year=None):
             rows.append({'patch': label, 'games': 0,
                          'wins': 0, 'win_rate': None})
     return rows
+
+
 
 
 def get_champion_patches(db_path, champion,

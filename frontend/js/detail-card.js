@@ -8,6 +8,26 @@ function wrClass(wr) {
   return 'mid';
 }
 
+// Builds the top-items row from the /api/champion-items response.
+function buildItemsHTML(items) {
+  if (!items || !items.length) return '';
+  const cells = items.map(it => {
+    const url = itemIconUrl(it.item_name);
+    const img = url
+      ? `<img src="${url}" class="item-icon" alt="${it.item_name}"
+             onerror="this.style.display='none'">`
+      : `<div class="item-icon item-icon-missing"></div>`;
+    return `<div class="item-cell" title="${it.item_name} — ${it.picks} games">
+      ${img}
+      <span class="item-picks">${it.picks}</span>
+    </div>`;
+  }).join('');
+  return `<div class="items-section">
+    <div class="ds-group-title">MOST BOUGHT</div>
+    <div class="items-grid">${cells}</div>
+  </div>`;
+}
+
 // Builds the stats grid HTML from the /api/champion-stats response.
 function buildStatsGrid(s) {
   if (!s || !Object.keys(s).length) return '';
@@ -50,6 +70,7 @@ function buildStatsGrid(s) {
 
   return '<div class="detail-stats">'
     + kda
+    + '<div id="items-grid"></div>'
     + '<div class="ds-columns">' + combat + economy + '</div>'
     + '</div>';
 }
@@ -125,6 +146,14 @@ async function selectChamp(d) {
   const stats = await fetch(statsUrl).then(r => r.json());
   const grid = document.getElementById('stats-grid');
   if (grid) grid.innerHTML = buildStatsGrid(stats);
+
+
+  // Fetch top items from Leaguepedia data and inject below KDA.
+  const itemsUrl = buildUrl('/api/champion-items',
+    { champion: d.champion, year });
+  const items = await fetch(itemsUrl).then(r => r.json());
+  const itemsEl = document.getElementById('items-grid');
+  if (itemsEl) itemsEl.innerHTML = buildItemsHTML(items);
 
   // Fetch and render the trend chart for the current zoom level.
   // Read zoom from the global, but also check the DOM dataset as a fallback.

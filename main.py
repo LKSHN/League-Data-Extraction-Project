@@ -8,6 +8,7 @@
 # Usage:
 #   python main.py             → skip rebuild if DB exists, just serve
 #   python main.py --rebuild   → re-download current year CSV + rebuild DB
+#   python main.py --items     → rebuild only the champion_items table (no CSV re-download)
 #   python main.py --server    → production mode: skip download/build, serve only
 #
 
@@ -19,7 +20,7 @@ import argparse
 from dotenv import load_dotenv
 load_dotenv()  # loads .env into os.environ before any module reads it
 
-from data.db import build_db
+from data.db import build_db, build_champion_items
 from data.downloader import ensure_data
 from server.app import create_app
 from server.config import (
@@ -41,9 +42,23 @@ def main():
         '--server', action='store_true',
         help='Production mode: skip download/build and serve existing DB',
     )
+    parser.add_argument(
+        '--items', action='store_true',
+        help='Rebuild only the champion_items table from Leaguepedia (no CSV re-download)',
+    )
     args = parser.parse_args()
 
-    if args.server:
+    if args.items:
+        # Only (re)fetch item data — useful when Leaguepedia was rate-limited
+        # during a previous --rebuild.
+        if not os.path.exists(DB_PATH):
+            raise FileNotFoundError(
+                f'DB not found at {DB_PATH}. Run --rebuild first.'
+            )
+        print(f'Rebuilding champion_items table...')
+        build_champion_items(DB_PATH, LEAGUE)
+        print('Done. Starting server...')
+    elif args.server:
         # Production: DB is pre-built and committed to the repo via Git LFS.
         # Never download or rebuild on the host — just serve.
         if not os.path.exists(DB_PATH):
@@ -56,6 +71,7 @@ def main():
         # force=True skips the cache check and re-downloads, overwriting the existing CSV.
         ensure_data(FOLDER_ID, YEAR, DOWNLOADS_DIR, force=args.rebuild)
         build_db(DOWNLOADS_DIR, DB_PATH, league=LEAGUE)
+        build_champion_items(DB_PATH, LEAGUE)
     else:
         print(f'Using existing DB: {DB_PATH}')
 
