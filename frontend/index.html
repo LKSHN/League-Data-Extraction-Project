@@ -64,8 +64,17 @@
   <!-- ── Players ── -->
   <div id="view-players" class="view">
     <div class="section-title">Players</div>
-    <input class="search-bar" id="player-search" type="text"
-      placeholder="Search player or team…" />
+    <div class="player-filter-bar">
+      <input class="search-bar" id="player-search" type="text"
+        placeholder="Search player or team…" />
+      <div class="role-pills">
+        <button class="role-pill" data-role="top"  onclick="setRoleFilter('top')">TOP</button>
+        <button class="role-pill" data-role="jng"  onclick="setRoleFilter('jng')">JNG</button>
+        <button class="role-pill" data-role="mid"  onclick="setRoleFilter('mid')">MID</button>
+        <button class="role-pill" data-role="bot"  onclick="setRoleFilter('bot')">BOT</button>
+        <button class="role-pill" data-role="sup"  onclick="setRoleFilter('sup')">SUP</button>
+      </div>
+    </div>
     <div class="details-layout">
       <div class="table-wrap">
         <table>
@@ -117,6 +126,8 @@
   <!-- ── Games ── -->
   <div id="view-games" class="view">
     <div class="section-title">Game Results</div>
+    <input class="search-bar" id="game-team-search" type="text"
+      placeholder="Filter by team…" />
     <div class="table-wrap">
       <table>
         <thead>

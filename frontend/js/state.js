@@ -16,6 +16,7 @@ let playerData    = [];   // player list from /api/players
 let selectedPlayer = null;
 let playerSortCol  = 'win_rate';
 let playerSortDir  = 'desc';
+let playerRoleFilter = null; // null = all roles
 
 let teamData      = [];   // team list from /api/teams
 let selectedTeam  = null;

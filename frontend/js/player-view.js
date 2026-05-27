@@ -30,12 +30,21 @@ function renderPlayerTable(data) {
   });
 }
 
+function setRoleFilter(role) {
+  playerRoleFilter = (playerRoleFilter === role) ? null : role;
+  document.querySelectorAll('.role-pill').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.role === playerRoleFilter);
+  });
+  renderPlayerTable(getFilteredSortedPlayers());
+}
+
 function getFilteredSortedPlayers() {
   const q = (document.getElementById('player-search')?.value || '').toLowerCase();
-  const rows = playerData.filter(
-    p => p.playername.toLowerCase().includes(q)
-      || (p.teamname || '').toLowerCase().includes(q)
-  );
+  const rows = playerData.filter(p => {
+    if (playerRoleFilter && p.position !== playerRoleFilter) return false;
+    return p.playername.toLowerCase().includes(q)
+      || (p.teamname || '').toLowerCase().includes(q);
+  });
   rows.sort((a, b) => {
     const av = typeof a[playerSortCol] === 'string' ? a[playerSortCol] : +a[playerSortCol];
     const bv = typeof b[playerSortCol] === 'string' ? b[playerSortCol] : +b[playerSortCol];

@@ -42,6 +42,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     .addEventListener('input', () => renderPlayerTable(getFilteredSortedPlayers()));
   document.getElementById('team-search')
     .addEventListener('input', () => renderTeamTable(getFilteredSortedTeams()));
+  document.getElementById('game-team-search')
+    .addEventListener('input', () => renderGames(gamesData));
 
   await loadInfo();
   const year = +document.getElementById('year-select').value || null;

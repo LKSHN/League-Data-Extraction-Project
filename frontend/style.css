@@ -581,6 +581,57 @@ td.game-team.red-side.win::before {
   font-size: 10px;
 }
 
+/* ── Champion icon (extra small, for game rows) ── */
+.champ-icon-xs {
+  width: 22px;
+  height: 22px;
+  border-radius: 3px;
+  object-fit: cover;
+  background: var(--border);
+}
+.game-picks {
+  display: flex;
+  gap: 2px;
+  margin-top: 4px;
+  flex-wrap: nowrap;
+}
+.game-team-name {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* ── Player filter bar (search + role pills) ── */
+.player-filter-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.player-filter-bar .search-bar {
+  margin-bottom: 0;
+  flex: 1;
+}
+.role-pills {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+}
+.role-pill {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+  font-size: 11px;
+  font-weight: 700;
+  padding: 4px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+  letter-spacing: 0.5px;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+.role-pill:hover { border-color: var(--gold); color: var(--text); }
+.role-pill.active { background: var(--gold); border-color: var(--gold); color: var(--bg); }
+
 /* ── Loading ── */
 .loading {
   display: flex;

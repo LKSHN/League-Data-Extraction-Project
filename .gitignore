@@ -39,6 +39,9 @@ downloads/*.csv.*
 Thumbs.db
 desktop.ini
 
+# ── Local idea backlog (personal notes, not shared) ──────
+IDEAS.md
+
 # ── Legacy root files from earlier project iteration ─────
 champion_info.json
 champion_info_2.json

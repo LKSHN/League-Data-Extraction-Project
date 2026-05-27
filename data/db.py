@@ -108,20 +108,48 @@ def get_stats(db_path, year=None, split=None,
     return compute_stats(df, min_games=min_games)
 
 
+_POS_ORDER = {'top': 0, 'jng': 1, 'mid': 2, 'bot': 3, 'sup': 4}
+
 def get_games(db_path, year=None, split=None, patch=None):
-    """Return game results sorted newest-first, optionally filtered."""
-    cols = (
-        'date, split, patch, blue_team, red_team,'
-        ' winner, gamelength'
-    )
+    """Return game results sorted newest-first with ordered champion picks."""
     where, params = _build_where(
         {'year': year, 'split': split, 'patch': patch}
     )
-    q = (f'SELECT {cols} FROM {SUMMARIES}{where}'
-         ' ORDER BY date DESC')
+    q = (f'SELECT gameid, date, split, patch, blue_team, red_team,'
+         f' winner, gamelength FROM {SUMMARIES}{where}'
+         f' ORDER BY date DESC')
     with sqlite3.connect(db_path) as conn:
-        df = pd.read_sql(q, conn, params=params or None)
-    return df.to_dict(orient='records')
+        games_df = pd.read_sql(q, conn, params=params or None)
+
+    if games_df.empty:
+        return []
+
+    # Fetch ordered picks for all returned games in one query.
+    gameids   = games_df['gameid'].tolist()
+    placeholders = ','.join(['?'] * len(gameids))
+    picks_q = (
+        f'SELECT gameid, side, champion, position FROM {TABLE}'
+        f' WHERE gameid IN ({placeholders})'
+    )
+    with sqlite3.connect(db_path) as conn:
+        picks_df = pd.read_sql(picks_q, conn, params=gameids)
+
+    # Group picks per (gameid, side) sorted by position order.
+    picks_map = {}
+    for _, row in picks_df.iterrows():
+        key = (row['gameid'], row['side'])
+        picks_map.setdefault(key, []).append(
+            (row['champion'], _POS_ORDER.get(row['position'], 9))
+        )
+    for key in picks_map:
+        picks_map[key] = [c for c, _ in sorted(picks_map[key], key=lambda x: x[1])]
+
+    records = games_df.to_dict(orient='records')
+    for g in records:
+        gid = g['gameid']
+        g['blue_picks'] = picks_map.get((gid, 'Blue'), [])
+        g['red_picks']  = picks_map.get((gid, 'Red'),  [])
+    return records
 
 
 def get_splits(db_path, year=None):

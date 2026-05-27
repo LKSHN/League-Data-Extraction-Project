@@ -8,9 +8,21 @@ function formatDuration(secs) {
   return `${m}:${s}`;
 }
 
+// DD/MM/YYYY (French format)
+function formatDate(dateStr) {
+  if (!dateStr) return '—';
+  const d = dateStr.slice(0, 10).split('-');
+  return `${d[2]}/${d[1]}/${d[0]}`;
+}
+
+// ── Team filter ───────────────────────────────────────────
+
+function getGameTeamFilter() {
+  return (document.getElementById('game-team-search')?.value || '').toLowerCase();
+}
+
 // ── Series grouping ───────────────────────────────────────
 
-// Groups a flat game list into series by (date, sorted team pair).
 function groupBySeries(games) {
   const map = new Map();
   games.forEach(g => {
@@ -37,12 +49,20 @@ function groupBySeries(games) {
   return [...map.values()];
 }
 
-// Infers BO format from the winning team's win count.
 function boType(s) {
   const maxW = Math.max(s.winsA, s.winsB);
   if (maxW >= 3) return 'BO5';
   if (maxW >= 2) return 'BO3';
   return 'BO1';
+}
+
+// ── Champion picks strip ──────────────────────────────────
+
+function picksHTML(champions) {
+  if (!champions || !champions.length) return '';
+  return `<div class="game-picks">${
+    champions.map(c => champImg(c, 'champ-icon-xs')).join('')
+  }</div>`;
 }
 
 // ── Row builders ─────────────────────────────────────────
@@ -61,7 +81,7 @@ function buildSeriesRow(s) {
   tr.innerHTML = `<td colspan="4" class="series-cell">
     <div class="series-inner">
       <span class="series-chevron">▸</span>
-      <span class="series-date">${s.date}<span class="series-meta">${meta ? ' · ' + meta : ''}</span></span>
+      <span class="series-date">${formatDate(s.date)}<span class="series-meta">${meta ? ' · ' + meta : ''}</span></span>
       <span class="series-matchup">
         <span class="series-team">${aLogo}<span>${s.teamA}</span></span>
         <span class="series-score">
@@ -87,8 +107,14 @@ function buildGameRows(series) {
     tr.className = 'game-row hidden';
     tr.innerHTML = `
       <td class="game-num">G${i + 1}</td>
-      <td class="game-team blue-side ${bCls}">${bImg}${g.blue_team || '—'}</td>
-      <td class="game-team red-side  ${rCls}">${rImg}${g.red_team  || '—'}</td>
+      <td class="game-team blue-side ${bCls}">
+        <div class="game-team-name">${bImg}${g.blue_team || '—'}</div>
+        ${picksHTML(g.blue_picks)}
+      </td>
+      <td class="game-team red-side ${rCls}">
+        <div class="game-team-name">${rImg}${g.red_team || '—'}</div>
+        ${picksHTML(g.red_picks)}
+      </td>
       <td class="game-dur">${formatDuration(g.gamelength)}</td>
     `;
     return tr;
@@ -101,7 +127,15 @@ function renderGames(games) {
   const tbody = document.getElementById('games-tbody');
   tbody.innerHTML = '';
 
-  const seriesList = groupBySeries(games);
+  const q = getGameTeamFilter();
+  const seriesList = groupBySeries(games).filter(s =>
+    !q || s.teamA.toLowerCase().includes(q) || s.teamB.toLowerCase().includes(q)
+  );
+
+  if (!seriesList.length) {
+    tbody.innerHTML = '<tr><td colspan="4" class="loading">No results</td></tr>';
+    return;
+  }
 
   seriesList.forEach(s => {
     const seriesRow = buildSeriesRow(s);
