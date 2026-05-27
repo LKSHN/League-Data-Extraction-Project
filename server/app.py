@@ -14,6 +14,7 @@ from data.db import (
     get_champion_splits, get_games, get_patches, get_splits, get_stats,
     get_years,
     get_players, get_player_stats, get_player_champions, get_player_splits,
+    get_player_rankings, get_player_split_history,
     get_teams, get_team_stats, get_team_matchups, get_team_champions,
     get_team_roster,
 )
@@ -167,6 +168,25 @@ def create_app(db_path):
         if not player:
             return jsonify([])
         return jsonify(get_player_splits(db_path, player))
+
+    @app.route('/api/player-rankings')
+    def api_player_rankings():
+        player = request.args.get('player')
+        year   = request.args.get('year', type=int)
+        split  = request.args.get('split') or None
+        patch  = request.args.get('patch') or None
+        if not player:
+            return jsonify({})
+        return jsonify(
+            get_player_rankings(db_path, player, year=year, split=split, patch=patch)
+        )
+
+    @app.route('/api/player-split-history')
+    def api_player_split_history():
+        player = request.args.get('player')
+        if not player:
+            return jsonify([])
+        return jsonify(get_player_split_history(db_path, player))
 
     # ── Teams ─────────────────────────────────────────────────────────────────
 

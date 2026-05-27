@@ -489,6 +489,89 @@ def get_player_stats(db_path, player, year=None, split=None, patch=None):
     return row
 
 
+def get_player_rankings(db_path, player, year=None, split=None, patch=None):
+    """Rank the player against same-position peers for key stats."""
+    where, params = _build_where({'year': year, 'split': split, 'patch': patch})
+    q = f'''
+        SELECT
+            playername,
+            MAX(position) AS position,
+            COUNT(DISTINCT gameid) AS games,
+            ROUND(AVG(golddiffat15),   0) AS gd15,
+            ROUND(AVG(xpdiffat15),     0) AS xpd15,
+            ROUND(AVG(csdiffat15),     1) AS csd15,
+            ROUND(AVG(dpm),            0) AS dpm,
+            ROUND(AVG(damageshare)*100,1) AS dmg_share,
+            ROUND(AVG(CAST(kills+assists AS FLOAT)/
+                  CASE WHEN deaths=0 THEN 1 ELSE deaths END), 2) AS kda,
+            ROUND(AVG(cspm),           2) AS cspm,
+            ROUND(AVG(vspm),           2) AS vspm,
+            ROUND(AVG(goldat15),       0) AS gold15
+        FROM {TABLE}{where}
+        GROUP BY playername
+        HAVING COUNT(DISTINCT gameid) >= 3
+    '''
+    with sqlite3.connect(db_path) as conn:
+        df = pd.read_sql(q, conn, params=params or None)
+    if df.empty:
+        return {}
+    prow = df[df['playername'] == player]
+    if prow.empty:
+        return {}
+    position = prow.iloc[0]['position']
+    peers    = df[df['position'] == position].copy()
+    STATS    = ['gd15', 'xpd15', 'csd15', 'dpm', 'dmg_share', 'kda', 'cspm', 'vspm', 'gold15']
+    result   = {'total': int(len(peers))}
+    for stat in STATS:
+        val = prow.iloc[0][stat]
+        if pd.isna(val):
+            continue
+        result[f'{stat}_rank'] = int((peers[stat] > val).sum()) + 1
+    return result
+
+
+def get_player_split_history(db_path, player):
+    """Return per-split stats for the career history table."""
+    where, params = _build_where({'playername': player})
+    q = f'''
+        SELECT year, split,
+            COUNT(DISTINCT gameid) AS games,
+            COUNT(DISTINCT CASE WHEN result=1 THEN gameid END) AS wins,
+            ROUND(100.0*COUNT(DISTINCT CASE WHEN result=1 THEN gameid END)/
+                  COUNT(DISTINCT gameid), 1) AS win_rate,
+            ROUND(AVG(CAST(kills+assists AS FLOAT)/
+                  CASE WHEN deaths=0 THEN 1 ELSE deaths END), 2) AS kda,
+            ROUND(AVG(dpm), 0) AS dpm,
+            ROUND(AVG(golddiffat15), 0) AS gd15,
+            ROUND(AVG(csdiffat15),  1) AS csd15
+        FROM {TABLE}{where}
+        GROUP BY year, split
+    '''
+    with sqlite3.connect(db_path) as conn:
+        df = pd.read_sql(q, conn, params=params or None)
+    rows = []
+    for _, r in df.iterrows():
+        sp = r['split'] if pd.notna(r['split']) else ''
+        if not sp:
+            continue
+        yr = int(r['year']) if pd.notna(r['year']) else 0
+        rows.append({
+            'label':    f'{sp} {yr}',
+            'games':    int(r['games']),
+            'wins':     int(r['wins']),
+            'win_rate': float(r['win_rate']) if pd.notna(r['win_rate']) else None,
+            'kda':      float(r['kda'])      if pd.notna(r['kda'])      else None,
+            'dpm':      int(r['dpm'])        if pd.notna(r['dpm'])      else None,
+            'gd15':     float(r['gd15'])     if pd.notna(r['gd15'])     else None,
+            'csd15':    float(r['csd15'])    if pd.notna(r['csd15'])    else None,
+            '_sort':    (yr, _SPLIT_ORDER.get(sp.lower(), 99)),
+        })
+    rows.sort(key=lambda x: x['_sort'], reverse=True)
+    for r in rows:
+        del r['_sort']
+    return rows
+
+
 def get_player_champions(db_path, player,
                          year=None, split=None, patch=None, top_n=8):
     """Return the player's most-played champions with stats."""

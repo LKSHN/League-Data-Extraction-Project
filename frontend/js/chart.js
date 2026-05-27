@@ -1,135 +1,134 @@
-// ── Patch history chart ──────────────────────────────────
-// Pure SVG-string builders. buildPatchChart is the public entry point;
-// the _patch* helpers are internal and only called from here.
-//
-// Layout: one unified chart area where the area chart (game counts) sits
-// behind the win-rate line. Both share the same X-axis but have independent
-// Y scales that map to the same pixel range.
+// ── Patch / split history chart ───────────────────────────
+// Bar chart (game count) + line overlay (win rate).
+// Matches the "Most Watched Esports" aesthetic:
+//   - Solid coloured bars for volume
+//   - White line with dot markers for win rate
+//   - Labels above bars and beside dots
 
-function _patchDotColor(wr) {
+// ── Helpers ───────────────────────────────────────────────
+
+function _wrColor(wr) {
   return wr >= 55 ? '#27ae60' : wr <= 45 ? '#c0392b' : '#c89b3c';
 }
 
-// Dashed 50 % reference line (win-rate scale).
-function _patchRef(lo, hi, x1, x2, yWR) {
+// Dashed 50% reference line
+function _refLine(lo, hi, x1, x2, yWR) {
   if (lo > 50 || hi < 50) return '';
   const y = yWR(50).toFixed(1);
   return `<line x1="${x1}" y1="${y}" x2="${x2}" y2="${y}"
-      stroke="#1e2d45" stroke-dasharray="3,3"/>
-    <text x="${x2 + 4}" y="${+y + 4}" text-anchor="start"
-      fill="#6b7a90" font-size="10">50%</text>`;
+      stroke="#1e2d45" stroke-dasharray="4,3" stroke-width="1"/>
+    <text x="${+x2 + 4}" y="${+y + 4}" fill="#6b7a90" font-size="10">50%</text>`;
 }
 
-// Area chart for game counts — bottom layer.
-// yG maps a game count to a Y pixel using its own 0→maxG scale.
-function _patchArea(patches, xS, yG, yBot) {
-  const topPts = patches.map((p, i) =>
-    `${xS(i).toFixed(1)},${(p.games > 0 ? yG(p.games) : yBot).toFixed(1)}`
-  ).join(' L ');
-  const x0  = xS(0).toFixed(1);
-  const xN  = xS(patches.length - 1).toFixed(1);
-  const yBs = yBot.toFixed(1);
-
-  const area = `<path d="M ${x0},${yBs} L ${topPts} L ${xN},${yBs} Z"
-    fill="rgba(29,161,200,0.10)" stroke="rgba(29,161,200,0.30)" stroke-width="1"/>`;
-
-  // Small game-count labels just above each peak.
-  const labels = patches.map((p, i) => {
-    if (p.games === 0) return '';
-    const cx = xS(i).toFixed(1);
-    const cy = (yG(p.games) - 4).toFixed(1);
-    return `<text x="${cx}" y="${cy}" text-anchor="middle"
-      fill="rgba(29,161,200,0.65)" font-size="8">${p.games}</text>`;
+// Vertical bars for game count
+function _bars(patches, xS, yBar, yBot, barW) {
+  return patches.map((p, i) => {
+    if (!p.games) return '';
+    const cx = xS(i);
+    const x  = cx - barW / 2;
+    const y  = yBar(p.games);
+    const h  = yBot - y;
+    return `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}"
+        width="${barW.toFixed(1)}" height="${h.toFixed(1)}"
+        fill="#c0392b" rx="2" opacity="0.85"/>
+      <text x="${cx.toFixed(1)}" y="${(y - 6).toFixed(1)}"
+        text-anchor="middle" fill="#e8e8e8"
+        font-size="11" font-weight="700">${p.games}</text>`;
   }).join('');
-
-  return area + labels;
 }
 
-// Win-rate line, breaking at unpicked patches (games === 0).
-function _patchLine(patches, xS, yWR) {
+// White line connecting played patches (breaks at gaps)
+function _wrLine(patches, xS, yWR) {
   let result = '';
   let seg    = [];
   const flush = () => {
     if (seg.length >= 2)
-      result += `<polyline points="${seg.join(' ')}" fill="none"
-        stroke="#c89b3c" stroke-width="1.5"/>`;
+      result += `<polyline points="${seg.join(' ')}"
+        fill="none" stroke="white" stroke-width="2" stroke-linejoin="round"/>`;
     seg = [];
   };
   patches.forEach((p, i) => {
     if (p.games > 0 && p.win_rate != null)
       seg.push(`${xS(i).toFixed(1)},${yWR(p.win_rate).toFixed(1)}`);
-    else
-      flush();
+    else flush();
   });
   flush();
   return result;
 }
 
-// Colored dots + win-rate labels for played patches;
-// hollow grey ring at the baseline for unpicked patches.
-function _patchDots(patches, xS, yWR, yBot) {
+// White-ring dots + WR label beside each dot
+function _wrDots(patches, xS, yWR, yBot) {
   return patches.map((p, i) => {
-    const cx = xS(i).toFixed(1);
-    if (p.games > 0 && p.win_rate != null) {
-      const cy = yWR(p.win_rate).toFixed(1);
-      return `<circle cx="${cx}" cy="${cy}" r="3.5"
-          fill="${_patchDotColor(p.win_rate)}"
-          stroke="#060b14" stroke-width="1.5"/>
-        <text x="${cx}" y="${+cy - 7}" text-anchor="middle"
-          fill="#c8aa6e" font-size="9">${p.win_rate}%</text>`;
+    const cx = xS(i);
+    if (!p.games || p.win_rate == null) {
+      // hollow grey ring at baseline for absent patches
+      return `<circle cx="${cx.toFixed(1)}" cy="${yBot.toFixed(1)}" r="3"
+          fill="none" stroke="#2a3a52" stroke-width="1.5"/>`;
     }
-    return `<circle cx="${cx}" cy="${yBot.toFixed(1)}" r="3"
-        fill="none" stroke="#2a3a52" stroke-width="1.5"/>`;
+    const cy   = yWR(p.win_rate);
+    const col  = _wrColor(p.win_rate);
+    // Position label to avoid overlap with bars — push to the right
+    const lx   = (cx + 9).toFixed(1);
+    const ly   = (cy + 4).toFixed(1);
+    return `<circle cx="${cx.toFixed(1)}" cy="${cy.toFixed(1)}" r="5"
+        fill="#060b14" stroke="white" stroke-width="2"/>
+      <text x="${lx}" y="${ly}"
+        fill="${col}" font-size="10" font-weight="600">${p.win_rate}%</text>`;
   }).join('');
 }
 
-// X-axis labels, always rotated -40°. Dim for unpicked patches.
-function _patchXLabels(patches, xS, yBase) {
+// Rotated X-axis labels
+function _xLabels(patches, xS, yBase) {
   return patches.map((p, i) => {
     const x   = xS(i).toFixed(1);
-    const col = p.games === 0 ? '#2a3a52' : '#6b7a90';
-    return `<text x="${x}" y="${yBase + 12}"
-      text-anchor="end" transform="rotate(-40,${x},${yBase + 12})"
+    const col = p.games === 0 ? '#2a3a52' : '#8a9ab0';
+    return `<text x="${x}" y="${yBase + 14}"
+      text-anchor="end" transform="rotate(-40,${x},${yBase + 14})"
       fill="${col}" font-size="10">${p.patch}</text>`;
   }).join('');
 }
 
-// Assembles the full combo chart (area + line) in one SVG.
+// ── Public entry point ────────────────────────────────────
+
 function buildPatchChart(patches) {
   if (!patches || patches.length < 2) {
-    return '<p style="color:#6b7a90;font-size:12px;padding:12px 0">Not enough data</p>';
+    return '<p class="chart-empty">Not enough data</p>';
   }
   const played = patches.filter(p => p.games > 0);
   if (played.length < 2) {
-    return '<p style="color:#6b7a90;font-size:12px;padding:12px 0">Not enough data</p>';
+    return '<p class="chart-empty">Not enough data</p>';
   }
 
-  const ml = 36, mr = 36, mt = 18, ch = 110, mb = 52;
-  const PER_COL = 65;
-  const pw = Math.max(560 - ml - mr, (patches.length - 1) * PER_COL);
+  // Layout
+  const ml = 8, mr = 48, mt = 28, ch = 120, mb = 54;
+  const PER_COL = 72;
+  const pw = Math.max(500 - ml - mr, (patches.length - 1) * PER_COL);
   const W  = ml + pw + mr;
   const H  = mt + ch + mb;
 
-  // Win-rate Y scale — based on played patches only.
-  const lo  = Math.max(0,   Math.min(...played.map(p => p.win_rate)) - 20);
-  const hi  = Math.min(100, Math.max(...played.map(p => p.win_rate)) + 20);
-  // Games Y scale — 0→maxG mapped to the same pixel range.
-  const maxG = Math.max(...played.map(p => p.games));
+  const colW = pw / Math.max(patches.length - 1, 1);
+  const barW = Math.min(colW * 0.45, 36);
 
-  const xS  = i  => ml + (i / (patches.length - 1)) * pw;
-  const yWR = wr => mt + ch * (1 - (wr - lo) / (hi - lo));
-  const yG  = g  => mt + ch * (1 - g / maxG);
+  // Scales
+  const maxG = Math.max(...played.map(p => p.games));
+  const wrVals = played.map(p => p.win_rate).filter(v => v != null);
+  const lo  = Math.max(0,   Math.min(...wrVals) - 15);
+  const hi  = Math.min(100, Math.max(...wrVals) + 15);
+
+  const xS   = i  => ml + (patches.length === 1 ? pw / 2 : (i / (patches.length - 1)) * pw);
+  const yWR  = wr => mt + ch * (1 - (wr - lo)  / (hi - lo));
+  const yBar = g  => mt + ch * (1 - g / maxG);
   const yBot = mt + ch;
 
   return [
     '<div class="patch-chart-scroll">',
-    `<svg viewBox="0 0 ${W} ${H}" style="width:${W}px;min-width:100%;overflow:visible">`,
-    _patchRef(lo, hi, ml, ml + pw, yWR),
-    _patchArea(patches, xS, yG, yBot),
-    _patchLine(patches, xS, yWR),
-    _patchDots(patches, xS, yWR, yBot),
-    _patchXLabels(patches, xS, yBot),
+    `<svg viewBox="0 0 ${W} ${H}" style="width:${W}px;min-width:100%;overflow:visible;display:block">`,
+    _refLine(lo, hi, ml, ml + pw, yWR),
+    _bars(patches, xS, yBar, yBot, barW),
+    _wrLine(patches, xS, yWR),
+    _wrDots(patches, xS, yWR, yBot),
+    _xLabels(patches, xS, yBot),
     '</svg>',
     '</div>',
-  ].join('');
+  ].join('\n');
 }
