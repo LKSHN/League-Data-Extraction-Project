@@ -379,3 +379,299 @@ def get_champion_patches(db_path, champion,
             'win_rate': None,
         }))
     return rows
+
+
+# ── Players ───────────────────────────────────────────────────────────────────
+
+def get_players(db_path, year=None, split=None, patch=None, min_games=3):
+    """Return all players with aggregate stats for the current filter."""
+    where, params = _build_where(
+        {'year': year, 'split': split, 'patch': patch}
+    )
+    q = f'''
+        SELECT playername, teamname, position,
+            COUNT(DISTINCT gameid)  AS games,
+            COUNT(DISTINCT CASE WHEN result=1 THEN gameid END) AS wins,
+            ROUND(100.0*COUNT(DISTINCT CASE WHEN result=1 THEN gameid END)/
+                  COUNT(DISTINCT gameid), 1) AS win_rate,
+            ROUND(AVG(kills),  2) AS avg_kills,
+            ROUND(AVG(deaths), 2) AS avg_deaths,
+            ROUND(AVG(assists),2) AS avg_assists,
+            ROUND(AVG(CAST(kills+assists AS FLOAT)/
+                  CASE WHEN deaths=0 THEN 1 ELSE deaths END), 2) AS kda,
+            ROUND(AVG(dpm),  0) AS dpm,
+            ROUND(AVG(cspm), 2) AS cspm,
+            ROUND(AVG(vspm), 2) AS vspm
+        FROM {TABLE}{where}
+        GROUP BY playername, teamname, position
+        HAVING COUNT(DISTINCT gameid) >= {min_games}
+        ORDER BY playername
+    '''
+    with sqlite3.connect(db_path) as conn:
+        df = pd.read_sql(q, conn, params=params or None)
+    # If a player appears with multiple team/position combos, keep the most-played row.
+    df = (df.sort_values('games', ascending=False)
+            .drop_duplicates(subset=['playername'])
+            .reset_index(drop=True))
+    return df.to_dict(orient='records')
+
+
+def get_player_stats(db_path, player, year=None, split=None, patch=None):
+    """Return detailed aggregate stats for one player."""
+    where, params = _build_where(
+        {'playername': player, 'year': year, 'split': split, 'patch': patch}
+    )
+    q = f'''
+        SELECT
+            COUNT(DISTINCT gameid) AS games,
+            COUNT(DISTINCT CASE WHEN result=1 THEN gameid END) AS wins,
+            ROUND(100.0*COUNT(DISTINCT CASE WHEN result=1 THEN gameid END)/
+                  COUNT(DISTINCT gameid), 1) AS win_rate,
+            ROUND(AVG(kills),  2) AS avg_kills,
+            ROUND(AVG(deaths), 2) AS avg_deaths,
+            ROUND(AVG(assists),2) AS avg_assists,
+            ROUND(AVG(CAST(kills+assists AS FLOAT)/
+                  CASE WHEN deaths=0 THEN 1 ELSE deaths END), 2) AS kda,
+            ROUND(AVG(dpm),  0) AS dpm,
+            ROUND(AVG(damageshare)*100, 1) AS damage_share,
+            ROUND(AVG(cspm), 2) AS cspm,
+            ROUND(AVG(vspm), 2) AS vspm,
+            ROUND(AVG(golddiffat15), 0) AS gold_diff15,
+            ROUND(AVG(xpdiffat15),  0) AS xp_diff15,
+            ROUND(AVG(csdiffat15),  1) AS cs_diff15,
+            ROUND(AVG(goldat15),    0) AS avg_gold15,
+            COUNT(DISTINCT CASE WHEN side='Blue' THEN gameid END) AS blue_games,
+            COUNT(DISTINCT CASE WHEN side='Blue' AND result=1 THEN gameid END) AS blue_wins,
+            COUNT(DISTINCT CASE WHEN side='Red'  THEN gameid END) AS red_games,
+            COUNT(DISTINCT CASE WHEN side='Red'  AND result=1 THEN gameid END) AS red_wins,
+            MAX(teamname) AS teamname,
+            MAX(position) AS position
+        FROM {TABLE}{where}
+    '''
+    with sqlite3.connect(db_path) as conn:
+        df = pd.read_sql(q, conn, params=params or None)
+    if df.empty or not df['games'].iloc[0]:
+        return {}
+    row = {k: (None if pd.isna(v) else (v.item() if hasattr(v, 'item') else v)) for k, v in df.iloc[0].items()}
+    row['losses']  = int(row['games']) - int(row['wins'])
+    row['blue_wr'] = (round(100*row['blue_wins']/row['blue_games'], 1)
+                      if row['blue_games'] else None)
+    row['red_wr']  = (round(100*row['red_wins']/row['red_games'], 1)
+                      if row['red_games'] else None)
+    return row
+
+
+def get_player_champions(db_path, player,
+                         year=None, split=None, patch=None, top_n=8):
+    """Return the player's most-played champions with stats."""
+    where, params = _build_where(
+        {'playername': player, 'year': year, 'split': split, 'patch': patch}
+    )
+    q = f'''
+        SELECT champion,
+            COUNT(DISTINCT gameid) AS games,
+            COUNT(DISTINCT CASE WHEN result=1 THEN gameid END) AS wins,
+            ROUND(100.0*COUNT(DISTINCT CASE WHEN result=1 THEN gameid END)/
+                  COUNT(DISTINCT gameid), 1) AS win_rate,
+            ROUND(AVG(CAST(kills+assists AS FLOAT)/
+                  CASE WHEN deaths=0 THEN 1 ELSE deaths END), 2) AS kda
+        FROM {TABLE}{where}
+        GROUP BY champion
+        ORDER BY games DESC
+        LIMIT {top_n}
+    '''
+    with sqlite3.connect(db_path) as conn:
+        df = pd.read_sql(q, conn, params=params or None)
+    return df.to_dict(orient='records')
+
+
+_SPLIT_ORDER = {
+    'winter': 0, 'spring': 1, 'summer': 2,
+    'finals': 3, 'versus': 4,
+}
+
+def get_player_splits(db_path, player):
+    """Return win rate by year+split for the player's career history chart."""
+    where, params = _build_where({'playername': player})
+    q = f'''
+        SELECT year, split,
+            COUNT(DISTINCT gameid) AS games,
+            COUNT(DISTINCT CASE WHEN result=1 THEN gameid END) AS wins,
+            ROUND(100.0*COUNT(DISTINCT CASE WHEN result=1 THEN gameid END)/
+                  COUNT(DISTINCT gameid), 1) AS win_rate
+        FROM {TABLE}{where}
+        GROUP BY year, split
+    '''
+    with sqlite3.connect(db_path) as conn:
+        df = pd.read_sql(q, conn, params=params or None)
+    rows = []
+    for _, r in df.iterrows():
+        sp = r['split'] if pd.notna(r['split']) else ''
+        if not sp:
+            continue
+        yr = int(r['year']) if pd.notna(r['year']) else 0
+        rows.append({
+            'patch':    f'{sp} {yr}',
+            'games':    int(r['games']),
+            'wins':     int(r['wins']),
+            'win_rate': float(r['win_rate']) if pd.notna(r['win_rate']) else None,
+            '_sort':    (yr, _SPLIT_ORDER.get(sp.lower(), 99)),
+        })
+    rows.sort(key=lambda x: x['_sort'])
+    for r in rows:
+        del r['_sort']
+    return rows
+
+
+# ── Teams ─────────────────────────────────────────────────────────────────────
+
+def get_teams(db_path, year=None, split=None, patch=None, min_games=3):
+    """Return all teams with aggregate stats."""
+    where, params = _build_where(
+        {'year': year, 'split': split, 'patch': patch}
+    )
+    q = f'''
+        SELECT teamname,
+            COUNT(DISTINCT gameid) AS games,
+            COUNT(DISTINCT CASE WHEN result=1 THEN gameid END) AS wins,
+            ROUND(100.0*COUNT(DISTINCT CASE WHEN result=1 THEN gameid END)/
+                  COUNT(DISTINCT gameid), 1) AS win_rate,
+            ROUND(AVG(gamelength)/60.0, 1) AS avg_game_min
+        FROM {TABLE}{where}
+        GROUP BY teamname
+        HAVING COUNT(DISTINCT gameid) >= {min_games}
+        ORDER BY win_rate DESC
+    '''
+    with sqlite3.connect(db_path) as conn:
+        df = pd.read_sql(q, conn, params=params or None)
+    return df.to_dict(orient='records')
+
+
+def get_team_stats(db_path, team, year=None, split=None, patch=None):
+    """Return detailed stats for one team."""
+    where, params = _build_where(
+        {'teamname': team, 'year': year, 'split': split, 'patch': patch}
+    )
+    q = f'''
+        SELECT
+            COUNT(DISTINCT gameid) AS games,
+            COUNT(DISTINCT CASE WHEN result=1 THEN gameid END) AS wins,
+            ROUND(100.0*COUNT(DISTINCT CASE WHEN result=1 THEN gameid END)/
+                  COUNT(DISTINCT gameid), 1) AS win_rate,
+            ROUND(AVG(gamelength)/60.0, 1) AS avg_game_min,
+            ROUND(SUM(kills)*1.0  / COUNT(DISTINCT gameid), 1) AS avg_kills,
+            ROUND(SUM(deaths)*1.0 / COUNT(DISTINCT gameid), 1) AS avg_deaths,
+            COUNT(DISTINCT CASE WHEN side='Blue' THEN gameid END) AS blue_games,
+            COUNT(DISTINCT CASE WHEN side='Blue' AND result=1 THEN gameid END) AS blue_wins,
+            COUNT(DISTINCT CASE WHEN side='Red'  THEN gameid END) AS red_games,
+            COUNT(DISTINCT CASE WHEN side='Red'  AND result=1 THEN gameid END) AS red_wins
+        FROM {TABLE}{where}
+    '''
+    with sqlite3.connect(db_path) as conn:
+        df = pd.read_sql(q, conn, params=params or None)
+    if df.empty or not df['games'].iloc[0]:
+        return {}
+    row = {k: (None if pd.isna(v) else (v.item() if hasattr(v, 'item') else v)) for k, v in df.iloc[0].items()}
+    row['losses']  = int(row['games']) - int(row['wins'])
+    row['blue_wr'] = (round(100*row['blue_wins']/row['blue_games'], 1)
+                      if row['blue_games'] else None)
+    row['red_wr']  = (round(100*row['red_wins']/row['red_games'], 1)
+                      if row['red_games'] else None)
+    return row
+
+
+def get_team_matchups(db_path, team, year=None, split=None, patch=None):
+    """Return head-to-head record vs each opponent."""
+    where_b, params_b = _build_where(
+        {'blue_team': team, 'year': year, 'split': split, 'patch': patch}
+    )
+    where_r, params_r = _build_where(
+        {'red_team': team, 'year': year, 'split': split, 'patch': patch}
+    )
+    q = f'''
+        SELECT opponent,
+            SUM(wins)   AS wins,
+            SUM(losses) AS losses,
+            SUM(wins) + SUM(losses) AS games
+        FROM (
+            SELECT red_team AS opponent,
+                CASE WHEN winner='blue' THEN 1 ELSE 0 END AS wins,
+                CASE WHEN winner='red'  THEN 1 ELSE 0 END AS losses
+            FROM {SUMMARIES}{where_b}
+            UNION ALL
+            SELECT blue_team AS opponent,
+                CASE WHEN winner='red'  THEN 1 ELSE 0 END AS wins,
+                CASE WHEN winner='blue' THEN 1 ELSE 0 END AS losses
+            FROM {SUMMARIES}{where_r}
+        )
+        GROUP BY opponent
+        ORDER BY games DESC, wins DESC
+    '''
+    with sqlite3.connect(db_path) as conn:
+        df = pd.read_sql(q, conn, params=(params_b + params_r) or None)
+    return df.to_dict(orient='records')
+
+
+def get_team_champions(db_path, team, year=None, split=None, patch=None, top_n=8):
+    """Return most-picked and most-banned champions for a team."""
+    where, params = _build_where(
+        {'teamname': team, 'year': year, 'split': split, 'patch': patch}
+    )
+    q_pick = f'''
+        SELECT champion,
+            COUNT(DISTINCT gameid) AS games,
+            COUNT(DISTINCT CASE WHEN result=1 THEN gameid END) AS wins,
+            ROUND(100.0*COUNT(DISTINCT CASE WHEN result=1 THEN gameid END)/
+                  COUNT(DISTINCT gameid), 1) AS win_rate
+        FROM {TABLE}{where}
+        GROUP BY champion
+        ORDER BY games DESC
+        LIMIT {top_n}
+    '''
+    # Load raw ban rows, dedup by gameid so each ban is counted once per game.
+    q_bans = f'SELECT DISTINCT gameid, ban1, ban2, ban3, ban4, ban5 FROM {TABLE}{where}'
+    with sqlite3.connect(db_path) as conn:
+        df_pick = pd.read_sql(q_pick, conn, params=params or None)
+        df_bans = pd.read_sql(q_bans, conn, params=params or None)
+
+    df_bans = df_bans.drop_duplicates(subset=['gameid'])
+    ban_counts = {}
+    for col in ['ban1', 'ban2', 'ban3', 'ban4', 'ban5']:
+        for val in df_bans[col].dropna():
+            if val and str(val).strip():
+                ban_counts[val] = ban_counts.get(val, 0) + 1
+    bans = [{'champion': k, 'games': v}
+            for k, v in sorted(ban_counts.items(), key=lambda x: -x[1])[:top_n]]
+
+    return {
+        'picks': df_pick.to_dict(orient='records'),
+        'bans':  bans,
+    }
+
+
+def get_team_roster(db_path, team, year=None, split=None, patch=None):
+    """Return roster with per-player stats, sorted by role."""
+    where, params = _build_where(
+        {'teamname': team, 'year': year, 'split': split, 'patch': patch}
+    )
+    q = f'''
+        SELECT playername, position,
+            COUNT(DISTINCT gameid) AS games,
+            COUNT(DISTINCT CASE WHEN result=1 THEN gameid END) AS wins,
+            ROUND(100.0*COUNT(DISTINCT CASE WHEN result=1 THEN gameid END)/
+                  COUNT(DISTINCT gameid), 1) AS win_rate,
+            ROUND(AVG(CAST(kills+assists AS FLOAT)/
+                  CASE WHEN deaths=0 THEN 1 ELSE deaths END), 2) AS kda,
+            ROUND(AVG(dpm),  0) AS dpm,
+            ROUND(AVG(cspm), 2) AS cspm
+        FROM {TABLE}{where}
+        GROUP BY playername, position
+        ORDER BY games DESC
+    '''
+    with sqlite3.connect(db_path) as conn:
+        df = pd.read_sql(q, conn, params=params or None)
+    df = df.drop_duplicates(subset=['playername'])
+    pos_order = {'top': 0, 'jng': 1, 'mid': 2, 'bot': 3, 'sup': 4}
+    df['_ord'] = df['position'].map(pos_order).fillna(5).astype(int)
+    df = df.sort_values('_ord').drop(columns=['_ord']).reset_index(drop=True)
+    return df.to_dict(orient='records')

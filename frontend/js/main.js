@@ -33,8 +33,15 @@ async function loadInfo() {
 document.addEventListener('DOMContentLoaded', async () => {
   setupNav();
   setupSortHeaders();
+  setupPlayerSortHeaders();
+  setupTeamSortHeaders();
+
   document.getElementById('search')
     .addEventListener('input', () => renderTable(getFilteredSorted()));
+  document.getElementById('player-search')
+    .addEventListener('input', () => renderPlayerTable(getFilteredSortedPlayers()));
+  document.getElementById('team-search')
+    .addEventListener('input', () => renderTeamTable(getFilteredSortedTeams()));
 
   await loadInfo();
   const year = +document.getElementById('year-select').value || null;
@@ -42,6 +49,12 @@ document.addEventListener('DOMContentLoaded', async () => {
   await loadSplits(year);
 
   // Icons load asynchronously and re-render once ready without blocking data.
-  loadDDragon().then(() => renderTable(getFilteredSorted()));
-  loadTeamLogos().then(() => renderGames(gamesData));
+  loadDDragon().then(() => {
+    renderTable(getFilteredSorted());
+    renderPlayerTable(getFilteredSortedPlayers());
+  });
+  loadTeamLogos().then(() => {
+    renderGames(gamesData);
+    renderTeamTable(getFilteredSortedTeams());
+  });
 });

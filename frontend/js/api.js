@@ -15,7 +15,6 @@ async function reloadData() {
   const url = buildUrl('/api/data', getFilters());
   allData = await fetch(url).then(r => r.json());
   selectedChamp = null;
-  // Clear the detail card so stale stats from the previous filter don't linger.
   document.getElementById('detail-card').innerHTML =
     '<div class="empty">Select a champion</div>';
   renderTable(getFilteredSorted());
@@ -31,7 +30,29 @@ async function reloadGames() {
   renderGames(gamesData);
 }
 
+async function reloadPlayers() {
+  playerData = await fetch(
+    buildUrl('/api/players', getFilters())
+  ).then(r => r.json());
+  selectedPlayer = null;
+  document.getElementById('player-detail-card').innerHTML =
+    '<div class="empty">Select a player</div>';
+  renderPlayerTable(getFilteredSortedPlayers());
+}
+
+async function reloadTeams() {
+  teamData = await fetch(
+    buildUrl('/api/teams', getFilters())
+  ).then(r => r.json());
+  selectedTeam = null;
+  document.getElementById('team-detail-card').innerHTML =
+    '<div class="empty">Select a team</div>';
+  renderTeamTable(getFilteredSortedTeams());
+}
+
 function reloadAll() {
   reloadData();
   reloadGames();
+  reloadPlayers();
+  reloadTeams();
 }

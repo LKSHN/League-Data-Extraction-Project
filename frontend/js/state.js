@@ -11,3 +11,13 @@ let ddVersion     = '';   // latest Data Dragon version string (e.g. "14.10.1")
 let teamLogoMap   = {};   // { teamName: imageUrl } from lolesports API
 let gamesData     = [];   // game-results array from /api/games
 let chartZoom     = 'patch'; // 'patch' or 'split' — controls chart granularity
+
+let playerData    = [];   // player list from /api/players
+let selectedPlayer = null;
+let playerSortCol  = 'win_rate';
+let playerSortDir  = 'desc';
+
+let teamData      = [];   // team list from /api/teams
+let selectedTeam  = null;
+let teamSortCol   = 'win_rate';
+let teamSortDir   = 'desc';
