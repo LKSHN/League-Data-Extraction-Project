@@ -40,6 +40,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     .addEventListener('input', () => renderTable(getFilteredSorted()));
   document.getElementById('player-search')
     .addEventListener('input', () => renderPlayerTable(getFilteredSortedPlayers()));
+  document.getElementById('team-search')
+    .addEventListener('input', () => renderTeamTable(getFilteredSortedTeams()));
 
   await loadInfo();
   const year = +document.getElementById('year-select').value || null;

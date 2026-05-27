@@ -25,7 +25,8 @@ function renderTeamTable(data) {
 }
 
 function getFilteredSortedTeams() {
-  const rows = [...teamData];
+  const q = (document.getElementById('team-search')?.value || '').toLowerCase();
+  const rows = teamData.filter(t => t.teamname.toLowerCase().includes(q));
   rows.sort((a, b) => {
     const av = typeof a[teamSortCol] === 'string' ? a[teamSortCol] : +a[teamSortCol];
     const bv = typeof b[teamSortCol] === 'string' ? b[teamSortCol] : +b[teamSortCol];

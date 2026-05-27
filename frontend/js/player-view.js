@@ -244,7 +244,7 @@ async function selectPlayer(p) {
     fetch(buildUrl('/api/player-champions',
       { player: p.playername, year, split, patch })).then(r => r.json()),
     fetch(buildUrl('/api/player-splits',
-      { player: p.playername, year })).then(r => r.json()),
+      { player: p.playername })).then(r => r.json()),
   ]);
 
   const champsEl = document.getElementById('player-champs-placeholder');

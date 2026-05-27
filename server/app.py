@@ -164,10 +164,9 @@ def create_app(db_path):
     @app.route('/api/player-splits')
     def api_player_splits():
         player = request.args.get('player')
-        year   = request.args.get('year',  type=int)
         if not player:
             return jsonify([])
-        return jsonify(get_player_splits(db_path, player, year=year))
+        return jsonify(get_player_splits(db_path, player))
 
     # ── Teams ─────────────────────────────────────────────────────────────────
 

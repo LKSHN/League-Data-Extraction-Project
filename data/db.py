@@ -485,9 +485,14 @@ def get_player_champions(db_path, player,
     return df.to_dict(orient='records')
 
 
-def get_player_splits(db_path, player, year=None):
-    """Return win rate by year+split for the player's history chart."""
-    where, params = _build_where({'playername': player, 'year': year})
+_SPLIT_ORDER = {
+    'winter': 0, 'spring': 1, 'summer': 2,
+    'finals': 3, 'versus': 4,
+}
+
+def get_player_splits(db_path, player):
+    """Return win rate by year+split for the player's career history chart."""
+    where, params = _build_where({'playername': player})
     q = f'''
         SELECT year, split,
             COUNT(DISTINCT gameid) AS games,
@@ -496,21 +501,25 @@ def get_player_splits(db_path, player, year=None):
                   COUNT(DISTINCT gameid), 1) AS win_rate
         FROM {TABLE}{where}
         GROUP BY year, split
-        ORDER BY year, split
     '''
     with sqlite3.connect(db_path) as conn:
         df = pd.read_sql(q, conn, params=params or None)
     rows = []
     for _, r in df.iterrows():
-        yr = int(r['year']) if r['year'] is not None else ''
-        sp = r['split'] or ''
-        label = f'{sp} {yr}'.strip() if sp else str(yr)
+        sp = r['split'] if pd.notna(r['split']) else ''
+        if not sp:
+            continue
+        yr = int(r['year']) if pd.notna(r['year']) else 0
         rows.append({
-            'patch':    label,
+            'patch':    f'{sp} {yr}',
             'games':    int(r['games']),
             'wins':     int(r['wins']),
-            'win_rate': float(r['win_rate']) if r['win_rate'] is not None else None,
+            'win_rate': float(r['win_rate']) if pd.notna(r['win_rate']) else None,
+            '_sort':    (yr, _SPLIT_ORDER.get(sp.lower(), 99)),
         })
+    rows.sort(key=lambda x: x['_sort'])
+    for r in rows:
+        del r['_sort']
     return rows
 
 
