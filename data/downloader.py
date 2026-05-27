@@ -135,7 +135,7 @@ def ensure_data(folder_id, year, dest='downloads', force=False):
     Flow:
       1. Return immediately if a matching CSV is already cached (unless force=True).
       2. Scrape the Drive folder for the file ID.
-      3. Try an automated download.
+      3. Try an automated download (removing any old CSV for that year first).
       4. If rate-limited, print manual download instructions.
       5. If the file ID can't be found at all, print the folder URL.
     """
@@ -145,6 +145,12 @@ def ensure_data(folder_id, year, dest='downloads', force=False):
     if cached and not force:
         print(f'Using cached: {os.path.basename(cached)}')
         return cached
+
+    # Remove all existing CSVs for this year before downloading a fresh copy
+    # so we never end up with two files for the same year.
+    for name in os.listdir(dest):
+        if str(year) in name and name.endswith('.csv'):
+            os.remove(os.path.join(dest, name))
 
     print(f'Looking for {year} data in Google Drive...')
     file_id = _scrape_file_id(folder_id, year)

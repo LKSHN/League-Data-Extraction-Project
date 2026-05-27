@@ -487,12 +487,84 @@ td.wr.mid   { color: var(--gold); }
 }
 
 /* ── Games table ── */
-.team-col { min-width: 140px; }
+.team-col     { min-width: 140px; }
+.game-num-col { width: 48px; }
 
-td.game-date  { color: var(--text-dim); white-space: nowrap; }
-td.game-split { color: var(--text-dim); font-size: 12px; }
-td.game-patch { color: var(--text-dim); font-size: 12px; }
-td.game-dur   { color: var(--text-dim); white-space: nowrap; }
+/* Series header row */
+tr.series-row { cursor: pointer; background: var(--panel); }
+tr.series-row:hover { background: #111d30; }
+
+td.series-cell { padding: 10px 16px; border-top: 1px solid var(--border); }
+
+.series-inner {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.series-chevron {
+  font-size: 10px;
+  color: var(--text-dim);
+  transition: transform 0.15s;
+  flex-shrink: 0;
+}
+tr.series-row.expanded .series-chevron { transform: rotate(90deg); }
+
+.series-date {
+  font-size: 12px;
+  color: var(--text-dim);
+  white-space: nowrap;
+  min-width: 80px;
+}
+.series-meta { color: var(--text-dim); opacity: 0.7; }
+
+.series-matchup {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+  justify-content: center;
+}
+.series-team {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+  color: var(--text);
+}
+.series-score {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 17px;
+  font-weight: 700;
+  min-width: 52px;
+  justify-content: center;
+}
+
+.bo-badge {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 4px;
+  background: rgba(200,155,60,0.12);
+  color: var(--gold);
+  letter-spacing: 0.5px;
+  flex-shrink: 0;
+}
+
+/* Individual game rows */
+tr.game-row { background: var(--bg); }
+tr.game-row.hidden { display: none; }
+tr.game-row:hover { background: #0a1220; }
+
+td.game-num {
+  color: var(--text-dim);
+  font-size: 11px;
+  padding-left: 36px;
+  width: 60px;
+}
+td.game-dur { color: var(--text-dim); white-space: nowrap; }
 
 td.game-team  { font-weight: 600; }
 td.game-team.win  { color: var(--win); }
