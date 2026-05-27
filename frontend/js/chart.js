@@ -56,24 +56,23 @@ function _wrLine(patches, xS, yWR) {
   return result;
 }
 
-// White-ring dots + WR label beside each dot
+// White-ring dots + WR label (alternates above/below to avoid overlap)
 function _wrDots(patches, xS, yWR, yBot) {
   return patches.map((p, i) => {
     const cx = xS(i);
     if (!p.games || p.win_rate == null) {
-      // hollow grey ring at baseline for absent patches
       return `<circle cx="${cx.toFixed(1)}" cy="${yBot.toFixed(1)}" r="3"
           fill="none" stroke="#2a3a52" stroke-width="1.5"/>`;
     }
-    const cy   = yWR(p.win_rate);
-    const col  = _wrColor(p.win_rate);
-    // Position label to avoid overlap with bars — push to the right
-    const lx   = (cx + 9).toFixed(1);
-    const ly   = (cy + 4).toFixed(1);
+    const cy  = yWR(p.win_rate);
+    const col = _wrColor(p.win_rate);
+    // Alternate label above/below to reduce overlap when values cluster
+    const offset = i % 2 === 0 ? -12 : 16;
+    const ly = (cy + offset).toFixed(1);
     return `<circle cx="${cx.toFixed(1)}" cy="${cy.toFixed(1)}" r="5"
         fill="#060b14" stroke="white" stroke-width="2"/>
-      <text x="${lx}" y="${ly}"
-        fill="${col}" font-size="10" font-weight="600">${p.win_rate}%</text>`;
+      <text x="${cx.toFixed(1)}" y="${ly}"
+        text-anchor="middle" fill="${col}" font-size="10" font-weight="600">${p.win_rate}%</text>`;
   }).join('');
 }
 
@@ -99,8 +98,8 @@ function buildPatchChart(patches) {
     return '<p class="chart-empty">Not enough data</p>';
   }
 
-  // Layout
-  const ml = 8, mr = 48, mt = 28, ch = 120, mb = 54;
+  // Layout — extra top margin for bar-count labels
+  const ml = 8, mr = 52, mt = 38, ch = 110, mb = 54;
   const PER_COL = 72;
   const pw = Math.max(500 - ml - mr, (patches.length - 1) * PER_COL);
   const W  = ml + pw + mr;
@@ -109,11 +108,14 @@ function buildPatchChart(patches) {
   const colW = pw / Math.max(patches.length - 1, 1);
   const barW = Math.min(colW * 0.45, 36);
 
-  // Scales
-  const maxG = Math.max(...played.map(p => p.games));
+  // Scales — widen WR range when all values are identical to avoid flat line at edge
+  const maxG   = Math.max(...played.map(p => p.games));
   const wrVals = played.map(p => p.win_rate).filter(v => v != null);
-  const lo  = Math.max(0,   Math.min(...wrVals) - 15);
-  const hi  = Math.min(100, Math.max(...wrVals) + 15);
+  const wrMin  = Math.min(...wrVals);
+  const wrMax  = Math.max(...wrVals);
+  const spread = wrMax - wrMin < 10 ? 15 : 10; // extra padding when values are clustered
+  const lo  = Math.max(0,   wrMin - spread);
+  const hi  = Math.min(100, wrMax + spread);
 
   const xS   = i  => ml + (patches.length === 1 ? pw / 2 : (i / (patches.length - 1)) * pw);
   const yWR  = wr => mt + ch * (1 - (wr - lo)  / (hi - lo));

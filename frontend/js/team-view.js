@@ -57,32 +57,77 @@ function setupTeamSortHeaders() {
 
 // ── Team detail card ──────────────────────────────────────
 
+// ── Team champion pool (by role) ──────────────────────────
+
+let _teamPicksData   = {};   // picks_by_role from API
+let _teamPicksSort   = 'games';
+
+const _ROLE_LABEL = { top: 'TOP', jng: 'JNG', mid: 'MID', bot: 'BOT', sup: 'SUP' };
+
+function _teamPoolIcon(c, showWR) {
+  const wr       = c.win_rate ?? 50;
+  const barColor = wr >= 55 ? '#27ae60' : wr <= 45 ? '#c0392b' : '#c89b3c';
+  const overlay  = showWR
+    ? `<div class="pool-hover-overlay"><span class="pool-hover-wr" style="color:${barColor}">${wr}%</span></div>` : '';
+  const bar      = showWR
+    ? `<div class="pool-wr-bar-bg"><div class="pool-wr-bar-fill" style="width:${wr}%;background:${barColor}"></div></div>` : '';
+  return `<div class="pool-icon">
+    ${champImg(c.champion, 'pool-champ-icon')}
+    ${overlay}
+    ${bar}
+    <div class="pool-games">${c.games}</div>
+  </div>`;
+}
+
+function _renderTeamPool() {
+  for (const pos of ['top', 'jng', 'mid', 'bot', 'sup']) {
+    const el = document.getElementById(`team-pool-${pos}`);
+    if (!el) continue;
+    const champs = [...(_teamPicksData[pos] || [])].sort((a, b) =>
+      _teamPicksSort === 'wr'
+        ? (b.win_rate ?? 0) - (a.win_rate ?? 0)
+        : b.games - a.games
+    );
+    el.innerHTML = champs.map(c => _teamPoolIcon(c, true)).join('');
+  }
+}
+
+function setTeamPicksSort(key) {
+  _teamPicksSort = key;
+  document.querySelectorAll('.team-pool-sort-btn').forEach(b =>
+    b.classList.toggle('active', b.dataset.sort === key)
+  );
+  _renderTeamPool();
+}
+
 function buildTeamChampsHTML(data) {
   if (!data) return '';
 
-  const cell = (c, showWR) => {
-    const img   = champImg(c.champion, 'champ-icon-sm');
-    const wrCls = wrClass(c.win_rate);
-    const wr    = showWR && c.win_rate != null
-      ? `<span class="wr ${wrCls}" style="font-size:9px">${c.win_rate}%</span>` : '';
-    return `<div class="item-cell" title="${c.champion} — ${c.games}g${showWR && c.win_rate != null ? ' · ' + c.win_rate + '% WR' : ''}">
-      ${img}
-      <span class="item-picks">${c.games}</span>
-      ${wr}
-    </div>`;
-  };
+  _teamPicksData = data.picks_by_role || {};
+  _teamPicksSort = 'games';
 
-  const picks = (data.picks || []).map(c => cell(c, true)).join('');
-  const bans  = (data.bans  || []).map(c => cell(c, false)).join('');
+  const roleSections = ['top', 'jng', 'mid', 'bot', 'sup'].map(pos => {
+    const label = _ROLE_LABEL[pos];
+    return `<div class="bc-section-title" style="margin-top:14px">
+        <span class="pos-badge pos-${pos}">${label}</span>
+      </div>
+      <div class="pool-grid" id="team-pool-${pos}"></div>`;
+  }).join('');
 
-  return `<div class="items-section">
-      <div class="ds-group-title">MOST PICKED</div>
-      <div class="items-grid">${picks}</div>
+  const bans = (data.bans || []).map(c => _teamPoolIcon(c, false)).join('');
+
+  return `
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-top:12px">
+      <div class="bc-section-title" style="margin:0">PICKS BY ROLE</div>
+      <span class="pool-sort-btns">
+        <button class="team-pool-sort-btn pool-sort-btn active" data-sort="games" onclick="setTeamPicksSort('games')">BY GAMES</button>
+        <button class="team-pool-sort-btn pool-sort-btn"        data-sort="wr"    onclick="setTeamPicksSort('wr')">BY WR</button>
+      </span>
     </div>
-    <div class="items-section">
-      <div class="ds-group-title">MOST BANNED</div>
-      <div class="items-grid">${bans}</div>
-    </div>`;
+    ${roleSections}
+    <div class="bc-section-title" style="margin-top:16px">MOST BANNED</div>
+    <div class="pool-grid">${bans}</div>
+  `;
 }
 
 function buildTeamMatchupsHTML(matchups) {
@@ -98,7 +143,7 @@ function buildTeamMatchupsHTML(matchups) {
       </span>
     </div>`;
   }).join('');
-  return `<div class="team-section-title">HEAD-TO-HEAD</div><div>${rows}</div>`;
+  return `<div class="bc-section-title" style="margin-top:16px">HEAD-TO-HEAD</div><div>${rows}</div>`;
 }
 
 function buildTeamRosterHTML(roster) {
@@ -117,7 +162,7 @@ function buildTeamRosterHTML(roster) {
       </span>
     </div>`;
   }).join('');
-  return `<div class="team-section-title">ROSTER</div><div>${rows}</div>`;
+  return `<div class="bc-section-title" style="margin-top:16px">ROSTER</div><div>${rows}</div>`;
 }
 
 function buildTeamDetailHTML(t, stats) {
@@ -149,34 +194,27 @@ function buildTeamDetailHTML(t, stats) {
       <span class="l">${lossRate}% L</span>
     </div>
 
-    <div class="detail-stats">
-      <div class="ds-columns">
-        <div class="ds-group">
-          <div class="ds-group-title">OVERVIEW</div>
-          <div class="ds-row">
-            <span class="ds-label">AVG GAME</span>
-            <span class="ds-value">${stats.avg_game_min != null ? stats.avg_game_min + 'm' : '—'}</span>
-          </div>
-          <div class="ds-row">
-            <span class="ds-label">AVG KILLS</span>
-            <span class="ds-value">${stats.avg_kills ?? '—'}</span>
-          </div>
-          <div class="ds-row">
-            <span class="ds-label">AVG DEATHS</span>
-            <span class="ds-value">${stats.avg_deaths ?? '—'}</span>
-          </div>
-        </div>
-        <div class="ds-group">
-          <div class="ds-group-title">SIDE WIN RATE</div>
-          <div class="ds-row">
-            <span class="ds-label"><span style="color:#4a9eff">●</span> BLUE <span class="rec-g">(${stats.blue_games ?? 0}g)</span></span>
-            <span class="ds-value">${stats.blue_wr != null ? stats.blue_wr + '%' : '—'}</span>
-          </div>
-          <div class="ds-row">
-            <span class="ds-label"><span style="color:#ff4a4a">●</span> RED <span class="rec-g">(${stats.red_games ?? 0}g)</span></span>
-            <span class="ds-value">${stats.red_wr != null ? stats.red_wr + '%' : '—'}</span>
-          </div>
-        </div>
+    <div class="bc-kda-row">
+      <div class="bc-kda-main">${stats.avg_kills ?? '—'}<span class="bc-kda-label"> AVG K</span></div>
+      <div class="bc-kda-breakdown" style="color:var(--text-dim)">
+        <span class="kda-d">${stats.avg_deaths ?? '—'} D</span>
+      </div>
+      <div class="bc-side-wr">
+        <span style="color:#4a9eff">●</span>
+        <span class="bc-side-label">BLUE</span>
+        <span class="bc-side-val">${stats.blue_wr != null ? stats.blue_wr + '%' : '—'}</span>
+        <span class="rec-g">(${stats.blue_games ?? 0}g)</span>
+        <span style="color:#ff4a4a;margin-left:10px">●</span>
+        <span class="bc-side-label">RED</span>
+        <span class="bc-side-val">${stats.red_wr != null ? stats.red_wr + '%' : '—'}</span>
+        <span class="rec-g">(${stats.red_games ?? 0}g)</span>
+      </div>
+    </div>
+    <div class="bc-grid">
+      <div class="bc-row">
+        <div class="bc-cell"><div class="bc-label">AVG GAME</div><div class="bc-value">${stats.avg_game_min != null ? stats.avg_game_min + 'm' : '—'}</div></div>
+        <div class="bc-cell"><div class="bc-label">AVG KILLS</div><div class="bc-value">${stats.avg_kills ?? '—'}</div></div>
+        <div class="bc-cell"><div class="bc-label">AVG DEATHS</div><div class="bc-value">${stats.avg_deaths ?? '—'}</div></div>
       </div>
     </div>
 
@@ -224,7 +262,7 @@ async function selectTeam(t) {
   const matchupsEl = document.getElementById('team-matchups-placeholder');
   const rosterEl   = document.getElementById('team-roster-placeholder');
 
-  if (champsEl)   champsEl.innerHTML   = buildTeamChampsHTML(champs);
+  if (champsEl)   { champsEl.innerHTML = buildTeamChampsHTML(champs); _renderTeamPool(); }
   if (matchupsEl) matchupsEl.innerHTML = buildTeamMatchupsHTML(matchups);
   if (rosterEl)   rosterEl.innerHTML   = buildTeamRosterHTML(roster);
 }

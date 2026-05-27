@@ -32,47 +32,37 @@ function buildItemsHTML(items) {
 function buildStatsGrid(s) {
   if (!s || !Object.keys(s).length) return '';
 
-  const fmt     = v => v != null ? v : '—';
-  const fmtGold = v => v != null
-    ? `<span class="${v >= 0 ? 'positive' : 'negative'}">${v >= 0 ? '+' : ''}${Math.round(v).toLocaleString()}</span>`
-    : '—';
+  const fmt  = v => v != null ? v : '—';
+  const sign = v => v != null ? (v >= 0 ? `+${Math.round(v).toLocaleString()}` : `${Math.round(v).toLocaleString()}`) : '—';
 
-  // KDA highlight box
-  const kda = s.kda != null
-    ? `<div class="kda-box">
-        <div class="kda-number">${s.kda}</div>
-        <div class="kda-label">KDA</div>
-        <div class="kda-breakdown">
-          <span class="kda-k">${fmt(s.avg_kills)}</span>
-          <span class="kda-sep"> / </span>
-          <span class="kda-d">${fmt(s.avg_deaths)}</span>
-          <span class="kda-sep"> / </span>
-          <span class="kda-a">${fmt(s.avg_assists)}</span>
-        </div>
-      </div>` : '';
+  const cell = (label, value) => `<div class="bc-cell">
+    <div class="bc-label">${label}</div>
+    <div class="bc-value">${value}</div>
+  </div>`;
 
-  const row = (label, val) =>
-    `<div class="ds-row"><span class="ds-label">${label}</span><span class="ds-value">${val}</span></div>`;
-
-  const combat = '<div class="ds-group">'
-    + '<div class="ds-group-title">COMBAT</div>'
-    + row('DPM',       fmt(s.dpm))
-    + row('DMG SHARE', s.damage_share != null ? s.damage_share + '%' : '—')
-    + row('VISION',    fmt(s.vision_score))
-    + '</div>';
-
-  const economy = '<div class="ds-group">'
-    + '<div class="ds-group-title">ECONOMY</div>'
-    + row('CSPM',      fmt(s.cspm))
-    + row('GOLD @15',  s.avg_gold15  != null ? Math.round(s.avg_gold15).toLocaleString() : '—')
-    + row('DIFF @15',  fmtGold(s.gold_diff15))
-    + '</div>';
-
-  return '<div class="detail-stats">'
-    + kda
-    + '<div id="items-grid"></div>'
-    + '<div class="ds-columns">' + combat + economy + '</div>'
-    + '</div>';
+  return `<div class="bc-kda-row">
+    <div class="bc-kda-main">${s.kda ?? '—'}<span class="bc-kda-label"> KDA</span></div>
+    <div class="bc-kda-breakdown">
+      <span class="kda-k">${fmt(s.avg_kills)}</span>
+      <span class="kda-sep"> / </span>
+      <span class="kda-d">${fmt(s.avg_deaths)}</span>
+      <span class="kda-sep"> / </span>
+      <span class="kda-a">${fmt(s.avg_assists)}</span>
+    </div>
+  </div>
+  <div id="items-grid"></div>
+  <div class="bc-grid" style="margin-top:10px">
+    <div class="bc-row">
+      ${cell('DPM',      fmt(s.dpm))}
+      ${cell('DMG%',     s.damage_share != null ? s.damage_share + '%' : '—')}
+      ${cell('VISION',   fmt(s.vision_score))}
+    </div>
+    <div class="bc-row">
+      ${cell('CSPM',     fmt(s.cspm))}
+      ${cell('GOLD@15',  s.avg_gold15 != null ? Math.round(s.avg_gold15).toLocaleString() : '—')}
+      ${cell('DIFF@15',  `<span class="${s.gold_diff15 >= 0 ? 'positive' : 'negative'}">${sign(s.gold_diff15)}</span>`)}
+    </div>
+  </div>`;
 }
 
 // Builds the static shell of the detail card (win rate, bar, placeholders).

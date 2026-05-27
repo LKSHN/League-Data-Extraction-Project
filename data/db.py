@@ -724,26 +724,35 @@ def get_team_matchups(db_path, team, year=None, split=None, patch=None):
 
 
 def get_team_champions(db_path, team, year=None, split=None, patch=None, top_n=8):
-    """Return most-picked and most-banned champions for a team."""
+    """Return picks grouped by role and most-banned champions for a team."""
     where, params = _build_where(
         {'teamname': team, 'year': year, 'split': split, 'patch': patch}
     )
     q_pick = f'''
-        SELECT champion,
+        SELECT position, champion,
             COUNT(DISTINCT gameid) AS games,
             COUNT(DISTINCT CASE WHEN result=1 THEN gameid END) AS wins,
             ROUND(100.0*COUNT(DISTINCT CASE WHEN result=1 THEN gameid END)/
                   COUNT(DISTINCT gameid), 1) AS win_rate
         FROM {TABLE}{where}
-        GROUP BY champion
-        ORDER BY games DESC
-        LIMIT {top_n}
+        GROUP BY position, champion
+        ORDER BY position, games DESC
     '''
     # Load raw ban rows, dedup by gameid so each ban is counted once per game.
     q_bans = f'SELECT DISTINCT gameid, ban1, ban2, ban3, ban4, ban5 FROM {TABLE}{where}'
     with sqlite3.connect(db_path) as conn:
         df_pick = pd.read_sql(q_pick, conn, params=params or None)
         df_bans = pd.read_sql(q_bans, conn, params=params or None)
+
+    # Group picks by role
+    picks_by_role = {}
+    for pos in ['top', 'jng', 'mid', 'bot', 'sup']:
+        rows = df_pick[df_pick['position'] == pos].to_dict(orient='records')
+        picks_by_role[pos] = [
+            {k: (None if pd.isna(v) else (v.item() if hasattr(v, 'item') else v))
+             for k, v in r.items()}
+            for r in rows
+        ]
 
     df_bans = df_bans.drop_duplicates(subset=['gameid'])
     ban_counts = {}
@@ -755,8 +764,8 @@ def get_team_champions(db_path, team, year=None, split=None, patch=None, top_n=8
             for k, v in sorted(ban_counts.items(), key=lambda x: -x[1])[:top_n]]
 
     return {
-        'picks': df_pick.to_dict(orient='records'),
-        'bans':  bans,
+        'picks_by_role': picks_by_role,
+        'bans':          bans,
     }
 
 
