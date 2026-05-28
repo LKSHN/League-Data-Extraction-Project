@@ -106,19 +106,19 @@ function buildBroadcastGrid(stats, rankings) {
   <div class="bc-section-title">STATS <span class="bc-vs-label">vs ${tot} ${(POS_LABEL[stats.position] || '').toLowerCase()}s</span></div>
   <div class="bc-grid">
     <div class="bc-row">
+      ${_bcCell('KDA',       stats.kda,                            r.kda_rank)}
+      ${_bcCell('DPM',       stats.dpm,                            r.dpm_rank)}
+      ${_bcCell('CSPM',      stats.cspm,                           r.cspm_rank)}
+    </div>
+    <div class="bc-row">
+      ${_bcCell('DMG%',      stats.damage_share != null ? stats.damage_share + '%' : null, r.dmg_share_rank)}
+      ${_bcCell('VSPM',      stats.vspm,                           r.vspm_rank)}
+      ${_bcCell('GOLD@15',   stats.avg_gold15 != null ? Math.round(stats.avg_gold15).toLocaleString() : null, r.gold15_rank)}
+    </div>
+    <div class="bc-row">
       ${_bcCell('GD@15',     sign(stats.gold_diff15),              r.gd15_rank)}
       ${_bcCell('CSD@15',    sign(stats.cs_diff15),                r.csd15_rank)}
       ${_bcCell('XPD@15',    sign(stats.xp_diff15),                r.xpd15_rank)}
-    </div>
-    <div class="bc-row">
-      ${_bcCell('DPM',       stats.dpm,                            r.dpm_rank)}
-      ${_bcCell('DMG%',      stats.damage_share != null ? stats.damage_share + '%' : null, r.dmg_share_rank)}
-      ${_bcCell('KDA',       stats.kda,                            r.kda_rank)}
-    </div>
-    <div class="bc-row">
-      ${_bcCell('CSPM',      stats.cspm,                           r.cspm_rank)}
-      ${_bcCell('VSPM',      stats.vspm,                           r.vspm_rank)}
-      ${_bcCell('GOLD@15',   stats.avg_gold15 != null ? Math.round(stats.avg_gold15).toLocaleString() : null, r.gold15_rank)}
     </div>
   </div>`;
 }

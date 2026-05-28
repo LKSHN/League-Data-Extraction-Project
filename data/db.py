@@ -295,16 +295,87 @@ def get_champion_avg_stats(db_path, champion,
             ROUND(AVG(visionscore), 1) AS vision_score
         FROM {TABLE}{where}
     '''
+    # Ban rate + Fearless-aware pick rate
+    where_b, params_b = _build_where({'year': year, 'split': split, 'patch': patch})
+    # Player table has champion + bans; SUMMARIES has blue_team/red_team/date
+    q_picks = f'SELECT DISTINCT gameid, champion, ban1, ban2, ban3, ban4, ban5 FROM {TABLE}{where_b} ORDER BY gameid'
+    q_series = f'SELECT DISTINCT gameid, date, blue_team, red_team FROM {SUMMARIES}{where_b} ORDER BY gameid'
     with sqlite3.connect(db_path) as conn:
-        row = conn.execute(q, params).fetchone()
+        row      = conn.execute(q, params).fetchone()
+        picks_df = pd.read_sql(q_picks,  conn, params=params_b or None)
+        series_df= pd.read_sql(q_series, conn, params=params_b or None)
+    gdf = picks_df.merge(series_df, on='gameid', how='left')
     if not row:
         return {}
+
     keys = [
         'avg_kills', 'avg_deaths', 'avg_assists', 'kda',
         'dpm', 'cspm', 'damage_share',
         'avg_gold15', 'gold_diff15', 'vision_score',
     ]
-    return {k: v for k, v in zip(keys, row) if v is not None}
+    result = {k: v for k, v in zip(keys, row) if v is not None}
+
+    # One row per game (dedup by gameid)
+    games = gdf.drop_duplicates(subset=['gameid'])
+    total_games = len(games)
+    if not total_games:
+        return result
+
+    # Ban rate: champion in any ban slot / total games
+    banned = games[
+        (games['ban1'] == champion) | (games['ban2'] == champion) |
+        (games['ban3'] == champion) | (games['ban4'] == champion) |
+        (games['ban5'] == champion)
+    ].shape[0]
+    result['ban_rate'] = round(100.0 * banned / total_games, 1)
+
+    # Fearless-aware pick rate
+    # All 10 picks per game
+    picks_per_game = gdf.groupby('gameid')['champion'].apply(set).to_dict()
+    # Series key = (date, frozenset of the two teams)
+    games = games.copy()
+    games['series_key'] = games.apply(
+        lambda r: (r['date'], frozenset([r['blue_team'], r['red_team']])), axis=1
+    )
+    # Bans per game (one row per game already deduped above)
+    bans_per_game = {}
+    for _, g in games.iterrows():
+        bans_per_game[g['gameid']] = {
+            b for b in [g['ban1'], g['ban2'], g['ban3'], g['ban4'], g['ban5']]
+            if b and str(b) != 'nan'
+        }
+
+    pick_eligible = 0
+    pick_count    = 0
+    ban_eligible  = 0
+    ban_count     = 0
+
+    for _, series in games.groupby('series_key', sort=False):
+        used_picks = set()
+        used_bans  = set()
+        for _, game in series.sort_values('gameid').iterrows():
+            gid        = game['gameid']
+            game_picks = picks_per_game.get(gid, set())
+            game_bans  = bans_per_game.get(gid, set())
+
+            if champion not in used_picks:
+                pick_eligible += 1
+                if champion in game_picks:
+                    pick_count += 1
+            if champion not in used_bans:
+                ban_eligible += 1
+                if champion in game_bans:
+                    ban_count += 1
+
+            used_picks.update(game_picks)
+            used_bans.update(game_bans)
+
+    if pick_eligible:
+        result['pick_rate'] = round(100.0 * pick_count / pick_eligible, 1)
+    if ban_eligible:
+        result['ban_rate'] = round(100.0 * ban_count / ban_eligible, 1)
+
+    return result
 
 
 def get_champion_splits(db_path, champion, year=None):
@@ -368,14 +439,20 @@ def get_champion_patches(db_path, champion,
     """
     # ── All patches in the window ────────────────────────────
     all_where, all_params = _build_where({'year': year, 'split': split})
-    q_all = (f'SELECT DISTINCT patch FROM {SUMMARIES}{all_where}'
+    q_all = (f'SELECT DISTINCT patch, split, year FROM {SUMMARIES}{all_where}'
              ' ORDER BY patch')
     with sqlite3.connect(db_path) as conn:
-        all_patches = [
-            p for p in
-            pd.read_sql(q_all, conn, params=all_params or None)['patch']
-            if p
-        ]
+        meta_df = pd.read_sql(q_all, conn, params=all_params or None)
+    meta_df = meta_df.dropna(subset=['patch'])
+    # patch → "Split Year" label (use most common split if ambiguous)
+    patch_split = {}
+    for patch, grp in meta_df.groupby('patch'):
+        row = grp.dropna(subset=['split'])
+        if not row.empty:
+            yr  = int(row.iloc[0]['year'])
+            sp  = str(row.iloc[0]['split']).capitalize()
+            patch_split[patch] = f'{sp} {yr}'
+    all_patches = [p for p in meta_df['patch'].unique() if p]
 
     # ── Champion-specific rows ───────────────────────────────
     where, params = _build_where(
@@ -400,12 +477,9 @@ def get_champion_patches(db_path, champion,
     # ── Merge: fill 0 for patches where champion wasn't played ─
     rows = []
     for p in all_patches:
-        rows.append(champ.get(p, {
-            'patch':    p,
-            'games':    0,
-            'wins':     0,
-            'win_rate': None,
-        }))
+        base = champ.get(p, {'patch': p, 'games': 0, 'wins': 0, 'win_rate': None})
+        base['split_label'] = patch_split.get(p)
+        rows.append(base)
     return rows
 
 

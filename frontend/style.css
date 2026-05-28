@@ -720,6 +720,35 @@ td.game-team.red-side.win::before {
   font-size: 13px;
   color: var(--text-dim);
 }
+.presence-rates {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 14px;
+  margin-top: 6px;
+}
+.presence-item {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+}
+.presence-sep {
+  width: 1px;
+  height: 28px;
+  background: #1e2d45;
+}
+.presence-label {
+  font-size: 9px;
+  color: #00c8a0;
+  font-weight: 700;
+  letter-spacing: 1px;
+}
+.presence-val {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text);
+  line-height: 1.2;
+}
 .bc-side-wr {
   margin-left: auto;
   display: flex;

@@ -86,6 +86,42 @@ function _xLabels(patches, xS, yBase) {
   }).join('');
 }
 
+// Split grouping bars below x-axis labels
+function _splitGroups(patches, xS, yBase) {
+  // Build consecutive groups with the same split_label
+  const groups = [];
+  let cur = null;
+  patches.forEach((p, i) => {
+    const lbl = p.split_label || null;
+    if (!lbl) { cur = null; return; }
+    if (!cur || cur.label !== lbl) {
+      cur = { label: lbl, start: i, end: i };
+      groups.push(cur);
+    } else {
+      cur.end = i;
+    }
+  });
+  if (!groups.length) return '';
+
+  const y     = yBase + 38;   // below rotated x-labels
+  const tickH = 4;
+
+  return groups.map(g => {
+    const x1 = xS(g.start);
+    const x2 = xS(g.end);
+    const cx = ((x1 + x2) / 2).toFixed(1);
+    return `
+      <line x1="${x1.toFixed(1)}" y1="${y}" x2="${x2.toFixed(1)}" y2="${y}"
+        stroke="#3a4d63" stroke-width="1.5"/>
+      <line x1="${x1.toFixed(1)}" y1="${y}" x2="${x1.toFixed(1)}" y2="${(y - tickH)}"
+        stroke="#3a4d63" stroke-width="1.5"/>
+      <line x1="${x2.toFixed(1)}" y1="${y}" x2="${x2.toFixed(1)}" y2="${(y - tickH)}"
+        stroke="#3a4d63" stroke-width="1.5"/>
+      <text x="${cx}" y="${(y + 11).toFixed(1)}"
+        text-anchor="middle" fill="#5a6d82" font-size="9">${g.label}</text>`;
+  }).join('');
+}
+
 // ── Public entry point ────────────────────────────────────
 
 function buildPatchChart(patches, containerW = 600) {
@@ -98,7 +134,7 @@ function buildPatchChart(patches, containerW = 600) {
   }
 
   // Layout
-  const ml = 52, mr = 52, mt = 16, ch = 90, mb = 46;
+  const ml = 52, mr = 52, mt = 16, ch = 90, mb = 62;
   const availW  = Math.max(200, containerW - ml - mr);
   const MIN_COL = 60;   // min spacing — exceeded → chart scrolls
   const MAX_COL = 110;  // max spacing — capped → few bars stay compact
@@ -135,6 +171,7 @@ function buildPatchChart(patches, containerW = 600) {
     _wrLine(patches, xS, yWR),
     _wrDots(patches, xS, yWR, yBot, mt),
     _xLabels(patches, xS, yBot),
+    _splitGroups(patches, xS, yBot),
     '</svg>',
     '</div>',
   ].join('\n');

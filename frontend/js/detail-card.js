@@ -54,13 +54,13 @@ function buildStatsGrid(s) {
   <div class="bc-grid" style="margin-top:10px">
     <div class="bc-row">
       ${cell('DPM',      fmt(s.dpm))}
-      ${cell('DMG%',     s.damage_share != null ? s.damage_share + '%' : '—')}
+      ${cell('GOLD@15',  s.avg_gold15 != null ? Math.round(s.avg_gold15).toLocaleString() : '—')}
       ${cell('VISION',   fmt(s.vision_score))}
     </div>
     <div class="bc-row">
-      ${cell('CSPM',     fmt(s.cspm))}
-      ${cell('GOLD@15',  s.avg_gold15 != null ? Math.round(s.avg_gold15).toLocaleString() : '—')}
+      ${cell('DMG%',     s.damage_share != null ? s.damage_share + '%' : '—')}
       ${cell('DIFF@15',  `<span class="${s.gold_diff15 >= 0 ? 'positive' : 'negative'}">${sign(s.gold_diff15)}</span>`)}
+      ${cell('CSPM',     fmt(s.cspm))}
     </div>
   </div>`;
 }
@@ -85,7 +85,10 @@ function buildDetailHTML(d) {
           <span class="rec-g">${d.total_games} games</span>
         </div>
       </div>
-      <div class="detail-wr ${wrCls}">${d.win_rate}%</div>
+      <div style="text-align:right">
+        <div class="detail-wr ${wrCls}">${d.win_rate}%</div>
+        <div id="presence-rates"></div>
+      </div>
     </div>
 
     <div class="wr-bar-bg">
@@ -136,6 +139,25 @@ async function selectChamp(d) {
   const stats = await fetch(statsUrl).then(r => r.json());
   const grid = document.getElementById('stats-grid');
   if (grid) grid.innerHTML = buildStatsGrid(stats);
+
+  const presenceEl = document.getElementById('presence-rates');
+  if (presenceEl) {
+    const pr = stats.pick_rate != null ? stats.pick_rate + '%' : '—';
+    const br = stats.ban_rate  != null ? stats.ban_rate  + '%' : '—';
+    presenceEl.innerHTML = `
+      <div class="presence-rates">
+        <div class="presence-item">
+          <span class="presence-label">PICK RATE</span>
+          <span class="presence-val">${pr}</span>
+        </div>
+        <div class="presence-sep"></div>
+        <div class="presence-item">
+          <span class="presence-label">BAN RATE</span>
+          <span class="presence-val">${br}</span>
+        </div>
+      </div>`;
+  }
+
 
 
   // Fetch top items from Leaguepedia data and inject below KDA.
