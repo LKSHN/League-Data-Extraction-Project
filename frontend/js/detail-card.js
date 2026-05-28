@@ -162,7 +162,7 @@ async function _renderChartForZoom(champion, year, split, mode) {
   const data = await fetch(url).then(r => r.json());
   const chart = document.getElementById('patch-chart');
   if (!chart) return;
-  chart.innerHTML = buildPatchChart(data);
+  chart.innerHTML = buildPatchChart(data, chart.offsetWidth || 600);
   // Scroll to the right end so the most recent data is visible on load.
   const scroller = chart.querySelector('.patch-chart-scroll');
   if (scroller) scroller.scrollLeft = scroller.scrollWidth;

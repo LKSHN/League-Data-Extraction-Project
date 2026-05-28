@@ -20,7 +20,7 @@ function _refLine(lo, hi, x1, x2, yWR) {
     <text x="${+x2 + 4}" y="${+y + 4}" fill="#6b7a90" font-size="10">50%</text>`;
 }
 
-// Vertical bars for game count
+// Vertical bars for game count — label at the bottom of each bar
 function _bars(patches, xS, yBar, yBot, barW) {
   return patches.map((p, i) => {
     if (!p.games) return '';
@@ -31,9 +31,9 @@ function _bars(patches, xS, yBar, yBot, barW) {
     return `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}"
         width="${barW.toFixed(1)}" height="${h.toFixed(1)}"
         fill="#c0392b" rx="2" opacity="0.85"/>
-      <text x="${cx.toFixed(1)}" y="${(y - 6).toFixed(1)}"
-        text-anchor="middle" fill="#e8e8e8"
-        font-size="11" font-weight="700">${p.games}</text>`;
+      <text x="${cx.toFixed(1)}" y="${(yBot - 4).toFixed(1)}"
+        text-anchor="middle" fill="#e8e8e8" font-size="9" font-weight="600"
+        paint-order="stroke fill" stroke="#c0392b" stroke-width="2">${p.games}</text>`;
   }).join('');
 }
 
@@ -56,8 +56,8 @@ function _wrLine(patches, xS, yWR) {
   return result;
 }
 
-// White-ring dots + WR label (alternates above/below to avoid overlap)
-function _wrDots(patches, xS, yWR, yBot) {
+// Dots + WR label always above the dot (never below into the bars)
+function _wrDots(patches, xS, yWR, yBot, mt) {
   return patches.map((p, i) => {
     const cx = xS(i);
     if (!p.games || p.win_rate == null) {
@@ -66,13 +66,12 @@ function _wrDots(patches, xS, yWR, yBot) {
     }
     const cy  = yWR(p.win_rate);
     const col = _wrColor(p.win_rate);
-    // Alternate label above/below to reduce overlap when values cluster
-    const offset = i % 2 === 0 ? -12 : 16;
-    const ly = (cy + offset).toFixed(1);
-    return `<circle cx="${cx.toFixed(1)}" cy="${cy.toFixed(1)}" r="5"
+    const ly  = Math.max(mt + 9, cy - 9).toFixed(1);
+    return `<circle cx="${cx.toFixed(1)}" cy="${cy.toFixed(1)}" r="4"
         fill="#060b14" stroke="white" stroke-width="2"/>
       <text x="${cx.toFixed(1)}" y="${ly}"
-        text-anchor="middle" fill="${col}" font-size="10" font-weight="600">${p.win_rate}%</text>`;
+        text-anchor="middle" fill="${col}" font-size="9" font-weight="600"
+        paint-order="stroke fill" stroke="#060b14" stroke-width="2.5">${p.win_rate}%</text>`;
   }).join('');
 }
 
@@ -89,7 +88,7 @@ function _xLabels(patches, xS, yBase) {
 
 // ── Public entry point ────────────────────────────────────
 
-function buildPatchChart(patches) {
+function buildPatchChart(patches, containerW = 600) {
   if (!patches || patches.length < 2) {
     return '<p class="chart-empty">Not enough data</p>';
   }
@@ -98,37 +97,43 @@ function buildPatchChart(patches) {
     return '<p class="chart-empty">Not enough data</p>';
   }
 
-  // Layout — extra top margin for bar-count labels
-  const ml = 8, mr = 52, mt = 38, ch = 110, mb = 54;
-  const PER_COL = 72;
-  const pw = Math.max(500 - ml - mr, (patches.length - 1) * PER_COL);
+  // Layout
+  const ml = 52, mr = 52, mt = 16, ch = 90, mb = 46;
+  const availW  = Math.max(200, containerW - ml - mr);
+  const MIN_COL = 60;   // min spacing — exceeded → chart scrolls
+  const MAX_COL = 110;  // max spacing — capped → few bars stay compact
+  const naturalColW = availW / Math.max(patches.length - 1, 1);
+  const colW = Math.min(MAX_COL, Math.max(MIN_COL, naturalColW));
+  const dataW = colW * Math.max(patches.length - 1, 1);
+  // Center the group when it's narrower than the container; scroll when it's wider
+  const offset = Math.max(0, (availW - dataW) / 2);
+  const pw = Math.max(availW, dataW);
   const W  = ml + pw + mr;
   const H  = mt + ch + mb;
 
-  const colW = pw / Math.max(patches.length - 1, 1);
-  const barW = Math.min(colW * 0.45, 36);
+  const barW = Math.min(colW * 0.4, 38);
 
-  // Scales — widen WR range when all values are identical to avoid flat line at edge
+  // Scales — widen WR range when all values cluster to avoid flat line at edge
   const maxG   = Math.max(...played.map(p => p.games));
   const wrVals = played.map(p => p.win_rate).filter(v => v != null);
   const wrMin  = Math.min(...wrVals);
   const wrMax  = Math.max(...wrVals);
-  const spread = wrMax - wrMin < 10 ? 15 : 10; // extra padding when values are clustered
+  const spread = wrMax - wrMin < 10 ? 15 : 10;
   const lo  = Math.max(0,   wrMin - spread);
   const hi  = Math.min(100, wrMax + spread);
 
-  const xS   = i  => ml + (patches.length === 1 ? pw / 2 : (i / (patches.length - 1)) * pw);
+  const xS = i => ml + offset + (patches.length === 1 ? dataW / 2 : (i / (patches.length - 1)) * dataW);
   const yWR  = wr => mt + ch * (1 - (wr - lo)  / (hi - lo));
   const yBar = g  => mt + ch * (1 - g / maxG);
   const yBot = mt + ch;
 
   return [
     '<div class="patch-chart-scroll">',
-    `<svg viewBox="0 0 ${W} ${H}" style="width:${W}px;min-width:100%;overflow:visible;display:block">`,
-    _refLine(lo, hi, ml, ml + pw, yWR),
+    `<svg viewBox="0 0 ${W} ${H}" style="width:${W}px;overflow:visible;display:block">`,
+    _refLine(lo, hi, ml + offset, ml + offset + dataW, yWR),
     _bars(patches, xS, yBar, yBot, barW),
     _wrLine(patches, xS, yWR),
-    _wrDots(patches, xS, yWR, yBot),
+    _wrDots(patches, xS, yWR, yBot, mt),
     _xLabels(patches, xS, yBot),
     '</svg>',
     '</div>',
