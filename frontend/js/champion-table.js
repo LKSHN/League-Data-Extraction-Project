@@ -8,7 +8,8 @@ function buildRowHTML(d) {
   return `<td class="name">${img}${d.champion}</td>`
     + `<td class="num">${d.total_games}</td>`
     + `<td class="num">${d.wins}</td>`
-    + `<td class="wr ${cls}">${d.win_rate}%</td>`;
+    + `<td class="wr ${cls}">${d.win_rate}%</td>`
+    + `<td class="num">${d.presence != null ? d.presence + '%' : '—'}</td>`;
 }
 
 // Re-renders the table body from a pre-filtered/sorted array.

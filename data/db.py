@@ -98,14 +98,42 @@ def get_years(db_path):
 
 def get_stats(db_path, year=None, split=None,
               patch=None, min_games=10):
-    """Return champion win-rate stats, optionally filtered by year/split/patch."""
+    """Return champion win-rate stats with presence (pick+ban rate)."""
     where, params = _build_where(
         {'year': year, 'split': split, 'patch': patch}
     )
-    q = f'SELECT champion, result FROM {TABLE}{where}'
+    q        = f'SELECT champion, result FROM {TABLE}{where}'
+    q_total  = f'SELECT COUNT(DISTINCT gameid) FROM {SUMMARIES}{where}'
+    q_bans   = f'''
+        SELECT champion, SUM(cnt) AS bans FROM (
+            SELECT ban1 AS champion, COUNT(*) AS cnt FROM {SUMMARIES}{where} GROUP BY ban1
+            UNION ALL
+            SELECT ban2, COUNT(*) FROM {SUMMARIES}{where} GROUP BY ban2
+            UNION ALL
+            SELECT ban3, COUNT(*) FROM {SUMMARIES}{where} GROUP BY ban3
+            UNION ALL
+            SELECT ban4, COUNT(*) FROM {SUMMARIES}{where} GROUP BY ban4
+            UNION ALL
+            SELECT ban5, COUNT(*) FROM {SUMMARIES}{where} GROUP BY ban5
+        ) WHERE champion IS NOT NULL AND champion != ''
+        GROUP BY champion
+    '''
+    p = params or []
     with sqlite3.connect(db_path) as conn:
-        df = pd.read_sql(q, conn, params=params or None)
-    return compute_stats(df, min_games=min_games)
+        df          = pd.read_sql(q, conn, params=p or None)
+        total_games = conn.execute(q_total, p).fetchone()[0]
+        bans_df     = pd.read_sql(q_bans, conn, params=p * 5 or None)
+
+    stats = compute_stats(df, min_games=min_games)
+    if total_games:
+        ban_map = bans_df.dropna(subset=['champion']).set_index('champion')['bans'].to_dict()
+        for row in stats:
+            pr = round(row['total_games'] / total_games * 100, 1)
+            br = round(ban_map.get(row['champion'], 0) / total_games * 100, 1)
+            row['pick_rate'] = pr
+            row['ban_rate']  = br
+            row['presence']  = round(min(100.0, pr + br), 1)
+    return stats
 
 
 _POS_ORDER = {'top': 0, 'jng': 1, 'mid': 2, 'bot': 3, 'sup': 4}

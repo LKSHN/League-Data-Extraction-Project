@@ -144,8 +144,17 @@ async function selectChamp(d) {
   if (presenceEl) {
     const pr = stats.pick_rate != null ? stats.pick_rate + '%' : '—';
     const br = stats.ban_rate  != null ? stats.ban_rate  + '%' : '—';
+    const pickN = stats.pick_rate ?? 0;
+    const banN  = stats.ban_rate  ?? 0;
+    const presence = stats.pick_rate != null || stats.ban_rate != null
+      ? Math.min(100, Math.round((pickN + banN) * 10) / 10) + '%' : '—';
     presenceEl.innerHTML = `
       <div class="presence-rates">
+        <div class="presence-item">
+          <span class="presence-label">PRESENCE</span>
+          <span class="presence-val">${presence}</span>
+        </div>
+        <div class="presence-sep"></div>
         <div class="presence-item">
           <span class="presence-label">PICK RATE</span>
           <span class="presence-val">${pr}</span>
