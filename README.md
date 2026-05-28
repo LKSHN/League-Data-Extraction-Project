@@ -10,17 +10,24 @@ pinned: false
 # League Esports Data Analysis
 
 A local web application that loads Oracle's Elixir match data, stores it in
-SQLite, and serves an interactive dashboard for exploring champion statistics
-and game results across any league.
+SQLite, and serves an interactive dashboard for exploring champion, player,
+and team statistics across any league.
 
 ---
 
 ## Features
 
-- **Year → Split → Patch** cascading filter — narrow stats to any time window
-- **Champion Details** — sortable table with per-champion win rate, wins, and
-  games played; click any champion for a detail card that includes a win-rate
-  trend line across patches
+- **Year → Split → Patch** cascading filter — narrow all stats to any time window
+- **Champion Details** — sortable table (games, wins, win rate, presence) with a
+  detail card showing KDA, DPM, GOLD@15, CSPM, DMG%, DIFF@15, VISION, pick/ban
+  rates (Fearless Draft-aware), most-bought items, and a per-patch / per-split
+  win-rate trend chart
+- **Players** — sortable table with role filter; detail card shows broadcast-style
+  stats grid with positional rankings, champion pool (sortable by games or WR),
+  and full career split history
+- **Teams** — sortable table; detail card shows win rate, avg game time, head-to-head
+  matchup record, current roster, and champion picks by role (sortable by games or WR)
+  plus bans
 - **Game Results** — full game log sorted newest-first with team logos, split,
   patch, and duration
 - **Auto-download** — on first run the app tries to download the current year's
@@ -33,11 +40,27 @@ and game results across any league.
 
 ## Screenshots
 
+### Champions
 ![Champion Details](screenshots/champion-details-v2.png)
-*Champion stats table with win-rate detail card and per-patch trend chart*
+*Sortable champion table (games, wins, win rate, presence) with a detail card showing
+KDA, DPM, GOLD@15, CSPM, DMG%, DIFF@15, VISION score, pick/ban rates, most-bought items,
+and a per-patch win-rate trend chart with split grouping.*
 
+### Players
+![Player Details](screenshots/player-details.png)
+*Player list filterable by role, with a broadcast-style detail card: stats grid ranked
+against peers at the same position, champion pool sortable by games or win rate,
+and full career split history.*
+
+### Teams
+![Team Details](screenshots/team-details.png)
+*Team overview with win rate, average game time, head-to-head matchup record,
+current roster, and champion picks organised by role (sortable by games or WR) plus bans.*
+
+### Games
 ![Game Results](screenshots/game-results-v2.png)
-*Game results log with team logos, split, patch, and duration*
+*Full game log with series grouping, champion picks per side, and game duration.
+Filterable by team name.*
 
 ---
 
@@ -45,13 +68,14 @@ and game results across any league.
 
 | Layer | Technology |
 |---|---|
-| Backend | Python 3.14 + Flask |
+| Backend | Python 3 + Flask |
 | Data | pandas + SQLite (`sqlite3`) |
 | Download | gdown + requests |
 | Frontend | Vanilla JS + SVG charts |
 | Styling | CSS custom properties |
 | Champion icons | Riot Data Dragon CDN |
 | Team logos | lolesports API |
+| Item data | Leaguepedia (MediaWiki API) |
 
 ---
 
@@ -71,12 +95,25 @@ League Data Extraction Project/
 │   ├── loader.py             # Parse OE CSVs into DataFrames
 │   ├── db.py                 # Build and query the SQLite database
 │   ├── stats.py              # Per-champion win-rate aggregation
+│   ├── leaguepedia.py        # Fetch item build data from Leaguepedia
 │   └── teams.py              # Fetch team logos from lolesports API
 │
 ├── frontend/
 │   ├── index.html            # Single-page shell
-│   ├── app.js                # All UI logic (filters, tables, SVG chart)
-│   └── style.css             # Dark League-themed styles
+│   ├── style.css             # Dark League-themed styles
+│   └── js/
+│       ├── state.js          # Shared state (filters, selections, sort)
+│       ├── api.js            # URL builder helpers
+│       ├── filters.js        # Year/Split/Patch cascading filter logic
+│       ├── ddragon.js        # Champion icon URLs (Data Dragon)
+│       ├── teams.js          # Team logo map
+│       ├── chart.js          # SVG patch/split win-rate trend chart
+│       ├── champion-table.js # Champion list table + sorting
+│       ├── detail-card.js    # Champion detail card + async sections
+│       ├── player-view.js    # Player list table + detail card
+│       ├── team-view.js      # Team list table + detail card
+│       ├── games.js          # Game results table
+│       └── main.js           # Bootstrap: load data, wire navigation
 │
 └── downloads/                # Created at runtime — not committed
     ├── *.csv                 # Oracle's Elixir per-year data files
@@ -88,7 +125,7 @@ League Data Extraction Project/
 ## Prerequisites
 
 ```bash
-pip install flask pandas requests gdown
+pip install flask pandas requests gdown mwclient
 ```
 
 ---
@@ -133,18 +170,47 @@ community-maintained per-player CSV files covering most major leagues back
 to 2014. Each row represents one player in one game; team-level summary rows
 are also included and used to build the game-results table.
 
+Item build data is fetched from **[Leaguepedia](https://lol.fandom.com)** via
+the MediaWiki API.
+
 ---
 
 ## API Endpoints
 
+### Champions
+| Endpoint | Params | Returns |
+|---|---|---|
+| `GET /api/data` | `year`, `split`, `patch` | champion win-rate stats with presence |
+| `GET /api/champion-stats` | `champion`, `year`, `split`, `patch` | avg KDA, DPM, CSPM, pick/ban rates |
+| `GET /api/champion-items` | `champion`, `year` | most-bought items from Leaguepedia |
+| `GET /api/champion-patches` | `champion`, `year`, `split` | per-patch win-rate trend |
+| `GET /api/champion-splits` | `champion`, `year` | per-split win-rate trend |
+
+### Players
+| Endpoint | Params | Returns |
+|---|---|---|
+| `GET /api/players` | `year`, `split`, `patch` | player list with KDA, DPM, WR |
+| `GET /api/player-stats` | `player`, `year`, `split`, `patch` | detailed stats + blue/red side WR |
+| `GET /api/player-champions` | `player`, `year`, `split`, `patch` | champion pool |
+| `GET /api/player-rankings` | `player`, `year`, `split`, `patch` | positional stat rankings |
+| `GET /api/player-split-history` | `player` | career split-by-split history |
+
+### Teams
+| Endpoint | Params | Returns |
+|---|---|---|
+| `GET /api/teams` | `year`, `split`, `patch` | team list with WR and avg game time |
+| `GET /api/team-stats` | `team`, `year`, `split`, `patch` | detailed team stats |
+| `GET /api/team-matchups` | `team`, `year`, `split`, `patch` | head-to-head record vs each opponent |
+| `GET /api/team-champions` | `team`, `year`, `split`, `patch` | picks by role + bans |
+| `GET /api/team-roster` | `team`, `year`, `split`, `patch` | current roster |
+
+### Meta
 | Endpoint | Params | Returns |
 |---|---|---|
 | `GET /api/info` | — | years available, league, download URL |
-| `GET /api/data` | `year`, `split`, `patch` | champion win-rate stats |
-| `GET /api/games` | `year`, `split`, `patch` | game results list |
 | `GET /api/splits` | `year` | splits available for that year |
 | `GET /api/patches` | `year`, `split` | patches available |
-| `GET /api/champion-patches` | `champion`, `year`, `split` | per-patch win-rate trend |
+| `GET /api/games` | `year`, `split`, `patch` | game results list |
 | `GET /api/team-logos` | — | `{name: imageUrl}` map |
 
 ---
