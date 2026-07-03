@@ -104,17 +104,24 @@ def get_stats(db_path, year=None, split=None,
     )
     q        = f'SELECT champion, result FROM {TABLE}{where}'
     q_total  = f'SELECT COUNT(DISTINCT gameid) FROM {SUMMARIES}{where}'
+    # Bans live on the per-player `games` table (each side's 5 players share
+    # the same ban1..ban5 for their team), so dedupe by gameid before
+    # counting or every ban would be counted 5x.
     q_bans   = f'''
+        WITH distinct_bans AS (
+            SELECT DISTINCT gameid, ban1, ban2, ban3, ban4, ban5
+            FROM {TABLE}{where}
+        )
         SELECT champion, SUM(cnt) AS bans FROM (
-            SELECT ban1 AS champion, COUNT(*) AS cnt FROM {SUMMARIES}{where} GROUP BY ban1
+            SELECT ban1 AS champion, COUNT(*) AS cnt FROM distinct_bans GROUP BY ban1
             UNION ALL
-            SELECT ban2, COUNT(*) FROM {SUMMARIES}{where} GROUP BY ban2
+            SELECT ban2, COUNT(*) FROM distinct_bans GROUP BY ban2
             UNION ALL
-            SELECT ban3, COUNT(*) FROM {SUMMARIES}{where} GROUP BY ban3
+            SELECT ban3, COUNT(*) FROM distinct_bans GROUP BY ban3
             UNION ALL
-            SELECT ban4, COUNT(*) FROM {SUMMARIES}{where} GROUP BY ban4
+            SELECT ban4, COUNT(*) FROM distinct_bans GROUP BY ban4
             UNION ALL
-            SELECT ban5, COUNT(*) FROM {SUMMARIES}{where} GROUP BY ban5
+            SELECT ban5, COUNT(*) FROM distinct_bans GROUP BY ban5
         ) WHERE champion IS NOT NULL AND champion != ''
         GROUP BY champion
     '''
@@ -122,7 +129,7 @@ def get_stats(db_path, year=None, split=None,
     with sqlite3.connect(db_path) as conn:
         df          = pd.read_sql(q, conn, params=p or None)
         total_games = conn.execute(q_total, p).fetchone()[0]
-        bans_df     = pd.read_sql(q_bans, conn, params=p * 5 or None)
+        bans_df     = pd.read_sql(q_bans, conn, params=p or None)
 
     stats = compute_stats(df, min_games=min_games)
     if total_games:
