@@ -23,6 +23,17 @@ SUMMARIES = 'game_summaries'  # per-game rows;   used for the game-results list
 ITEMS     = 'champion_items'  # aggregated item counts from Leaguepedia
 
 
+def _records(df):
+    """DataFrame -> list of dicts with NaN replaced by None.
+
+    NaN isn't valid JSON; leaving it in breaks the frontend's
+    response.json() call. Now that leagues beyond LEC are loaded,
+    plenty of columns (split, patch, per-game stats) legitimately
+    have gaps, so this can't be skipped.
+    """
+    return df.astype(object).where(pd.notnull(df), None).to_dict(orient='records')
+
+
 def _year_from_filename(path):
     """Extract a 4-digit year from a filename like '2024_OraclesElixir.csv'."""
     m = re.search(r'(\d{4})', os.path.basename(path))
@@ -179,7 +190,7 @@ def get_games(db_path, year=None, split=None, patch=None):
     for key in picks_map:
         picks_map[key] = [c for c, _ in sorted(picks_map[key], key=lambda x: x[1])]
 
-    records = games_df.to_dict(orient='records')
+    records = _records(games_df)
     for g in records:
         gid = g['gameid']
         g['blue_picks'] = picks_map.get((gid, 'Blue'), [])
@@ -194,7 +205,7 @@ def get_splits(db_path, year=None):
          ' ORDER BY split')
     with sqlite3.connect(db_path) as conn:
         df = pd.read_sql(q, conn, params=params or None)
-    return [s for s in df['split'].tolist() if s]
+    return [s for s in df['split'].tolist() if pd.notna(s) and s]
 
 
 def get_patches(db_path, year=None, split=None):
@@ -206,7 +217,7 @@ def get_patches(db_path, year=None, split=None):
          ' ORDER BY patch')
     with sqlite3.connect(db_path) as conn:
         df = pd.read_sql(q, conn, params=params or None)
-    return [p for p in df['patch'].tolist() if p]
+    return [p for p in df['patch'].tolist() if pd.notna(p) and p]
 
 
 def _find_year_csv(downloads_dir, year):
@@ -550,7 +561,7 @@ def get_players(db_path, year=None, split=None, patch=None, min_games=3):
     df = (df.sort_values('games', ascending=False)
             .drop_duplicates(subset=['playername'])
             .reset_index(drop=True))
-    return df.to_dict(orient='records')
+    return _records(df)
 
 
 def get_player_stats(db_path, player, year=None, split=None, patch=None):
@@ -702,7 +713,7 @@ def get_player_champions(db_path, player,
     '''
     with sqlite3.connect(db_path) as conn:
         df = pd.read_sql(q, conn, params=params or None)
-    return df.to_dict(orient='records')
+    return _records(df)
 
 
 _SPLIT_ORDER = {
@@ -764,7 +775,7 @@ def get_teams(db_path, year=None, split=None, patch=None, min_games=3):
     '''
     with sqlite3.connect(db_path) as conn:
         df = pd.read_sql(q, conn, params=params or None)
-    return df.to_dict(orient='records')
+    return _records(df)
 
 
 def get_team_stats(db_path, team, year=None, split=None, patch=None):
@@ -829,7 +840,7 @@ def get_team_matchups(db_path, team, year=None, split=None, patch=None):
     '''
     with sqlite3.connect(db_path) as conn:
         df = pd.read_sql(q, conn, params=(params_b + params_r) or None)
-    return df.to_dict(orient='records')
+    return _records(df)
 
 
 def get_team_champions(db_path, team, year=None, split=None, patch=None, top_n=8):
@@ -856,7 +867,7 @@ def get_team_champions(db_path, team, year=None, split=None, patch=None, top_n=8
     # Group picks by role
     picks_by_role = {}
     for pos in ['top', 'jng', 'mid', 'bot', 'sup']:
-        rows = df_pick[df_pick['position'] == pos].to_dict(orient='records')
+        rows = _records(df_pick[df_pick['position'] == pos])
         picks_by_role[pos] = [
             {k: (None if pd.isna(v) else (v.item() if hasattr(v, 'item') else v))
              for k, v in r.items()}
@@ -903,4 +914,4 @@ def get_team_roster(db_path, team, year=None, split=None, patch=None):
     pos_order = {'top': 0, 'jng': 1, 'mid': 2, 'bot': 3, 'sup': 4}
     df['_ord'] = df['position'].map(pos_order).fillna(5).astype(int)
     df = df.sort_values('_ord').drop(columns=['_ord']).reset_index(drop=True)
-    return df.to_dict(orient='records')
+    return _records(df)
