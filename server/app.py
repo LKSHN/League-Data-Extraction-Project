@@ -18,7 +18,7 @@ from data.db import (
     get_teams, get_team_stats, get_team_matchups, get_team_champions,
     get_team_roster,
 )
-from data.teams import fetch_team_logos
+from data.teams import fetch_team_logos, fetch_league_logos
 from server.config import FOLDER_ID, LEAGUE
 
 FRONTEND = os.path.abspath(
@@ -44,7 +44,7 @@ def create_app(db_path):
 
     @app.route('/api/data')
     def api_data():
-        year    = request.args.get('year',  type=int)
+        year    = request.args.getlist('year', type=int) or None
         split   = request.args.get('split') or None
         patch   = request.args.get('patch') or None
         leagues = _leagues()
@@ -56,7 +56,7 @@ def create_app(db_path):
 
     @app.route('/api/games')
     def api_games():
-        year  = request.args.get('year',  type=int)
+        year  = request.args.getlist('year', type=int) or None
         split = request.args.get('split') or None
         patch = request.args.get('patch') or None
         return jsonify(
@@ -71,7 +71,7 @@ def create_app(db_path):
     @app.route('/api/champion-stats')
     def api_champion_stats():
         champ = request.args.get('champion')
-        year  = request.args.get('year',  type=int)
+        year  = request.args.getlist('year', type=int) or None
         split = request.args.get('split') or None
         patch = request.args.get('patch') or None
         if not champ:
@@ -86,7 +86,7 @@ def create_app(db_path):
     @app.route('/api/champion-items')
     def api_champion_items():
         champ = request.args.get('champion')
-        year  = request.args.get('year', type=int)
+        year  = request.args.getlist('year', type=int) or None
         if not champ:
             return jsonify([])
         return jsonify(get_champion_items(db_path, champ, year=year))
@@ -94,7 +94,7 @@ def create_app(db_path):
     @app.route('/api/champion-splits')
     def api_champion_splits():
         champ = request.args.get('champion')
-        year  = request.args.get('year', type=int)
+        year  = request.args.getlist('year', type=int) or None
         if not champ:
             return jsonify([])
         return jsonify(
@@ -104,7 +104,7 @@ def create_app(db_path):
     @app.route('/api/champion-patches')
     def api_champion_patches():
         champ = request.args.get('champion')
-        year  = request.args.get('year',  type=int)
+        year  = request.args.getlist('year', type=int) or None
         split = request.args.get('split') or None
         if not champ:
             return jsonify([])
@@ -116,6 +116,10 @@ def create_app(db_path):
     @app.route('/api/team-logos')
     def api_team_logos():
         return jsonify(fetch_team_logos())
+
+    @app.route('/api/league-logos')
+    def api_league_logos():
+        return jsonify(fetch_league_logos())
 
     @app.route('/api/info')
     def api_info():
@@ -129,7 +133,7 @@ def create_app(db_path):
 
     @app.route('/api/players')
     def api_players():
-        year  = request.args.get('year',  type=int)
+        year  = request.args.getlist('year', type=int) or None
         split = request.args.get('split') or None
         patch = request.args.get('patch') or None
         return jsonify(
@@ -140,7 +144,7 @@ def create_app(db_path):
     @app.route('/api/player-stats')
     def api_player_stats():
         player = request.args.get('player')
-        year   = request.args.get('year',  type=int)
+        year   = request.args.getlist('year', type=int) or None
         split  = request.args.get('split') or None
         patch  = request.args.get('patch') or None
         if not player:
@@ -158,7 +162,7 @@ def create_app(db_path):
     @app.route('/api/player-champions')
     def api_player_champions():
         player = request.args.get('player')
-        year   = request.args.get('year',  type=int)
+        year   = request.args.getlist('year', type=int) or None
         split  = request.args.get('split') or None
         patch  = request.args.get('patch') or None
         if not player:
@@ -178,7 +182,7 @@ def create_app(db_path):
     @app.route('/api/player-rankings')
     def api_player_rankings():
         player = request.args.get('player')
-        year   = request.args.get('year', type=int)
+        year   = request.args.getlist('year', type=int) or None
         split  = request.args.get('split') or None
         patch  = request.args.get('patch') or None
         if not player:
@@ -199,7 +203,7 @@ def create_app(db_path):
 
     @app.route('/api/teams')
     def api_teams():
-        year  = request.args.get('year',  type=int)
+        year  = request.args.getlist('year', type=int) or None
         split = request.args.get('split') or None
         patch = request.args.get('patch') or None
         return jsonify(
@@ -210,7 +214,7 @@ def create_app(db_path):
     @app.route('/api/team-stats')
     def api_team_stats():
         team  = request.args.get('team')
-        year  = request.args.get('year',  type=int)
+        year  = request.args.getlist('year', type=int) or None
         split = request.args.get('split') or None
         patch = request.args.get('patch') or None
         if not team:
@@ -223,7 +227,7 @@ def create_app(db_path):
     @app.route('/api/team-matchups')
     def api_team_matchups():
         team  = request.args.get('team')
-        year  = request.args.get('year',  type=int)
+        year  = request.args.getlist('year', type=int) or None
         split = request.args.get('split') or None
         patch = request.args.get('patch') or None
         if not team:
@@ -236,7 +240,7 @@ def create_app(db_path):
     @app.route('/api/team-champions')
     def api_team_champions():
         team  = request.args.get('team')
-        year  = request.args.get('year',  type=int)
+        year  = request.args.getlist('year', type=int) or None
         split = request.args.get('split') or None
         patch = request.args.get('patch') or None
         if not team:
@@ -249,7 +253,7 @@ def create_app(db_path):
     @app.route('/api/team-roster')
     def api_team_roster():
         team  = request.args.get('team')
-        year  = request.args.get('year',  type=int)
+        year  = request.args.getlist('year', type=int) or None
         split = request.args.get('split') or None
         patch = request.args.get('patch') or None
         if not team:

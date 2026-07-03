@@ -17,18 +17,12 @@ function setupNav() {
 
 async function loadInfo() {
   const info = await fetch('/api/info').then(r => r.json());
-  const sel  = document.getElementById('year-select');
-  info.years.forEach(y => {
-    const opt = document.createElement('option');
-    opt.value = y; opt.textContent = y;
-    sel.appendChild(opt);
-  });
-  if (info.years.length > 0) sel.value = info.years[0];
-  sel.addEventListener('change', reloadAll);
+  loadYears(info.years);
 }
 
 document.addEventListener('DOMContentLoaded', async () => {
   setupNav();
+  setupFilterDrawer();
   setupSortHeaders();
   setupPlayerSortHeaders();
   setupTeamSortHeaders();
@@ -58,4 +52,5 @@ document.addEventListener('DOMContentLoaded', async () => {
     renderGamesStatTiles();
     renderTeamStatTiles();
   });
+  loadLeagueLogos().then(() => _refreshDrawerIfShowing('league'));
 });

@@ -25,16 +25,20 @@
     <div class="controls-bar">
       <div class="controls-inner">
         <div class="filter-cascade">
-          <select id="year-select" class="filter-select">
-            <option value="">All years</option>
-          </select>
-          <div class="league-filter" id="league-filter">
-            <button type="button" class="league-filter-btn" id="league-filter-btn">
-              All Leagues
-              <span class="league-filter-caret">▾</span>
-            </button>
-            <div class="league-filter-panel" id="league-filter-panel"></div>
-          </div>
+          <button type="button" class="filter-drawer-btn" id="year-filter-btn" data-kind="year">
+            All Years <span class="filter-drawer-caret">▾</span>
+          </button>
+          <button type="button" class="filter-drawer-btn" id="league-filter-btn" data-kind="league">
+            All Leagues <span class="filter-drawer-caret">▾</span>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div class="filter-drawer" id="filter-drawer">
+      <div class="filter-drawer-clip">
+        <div class="filter-drawer-body-wrap">
+          <div class="filter-drawer-body" id="filter-drawer-body"></div>
         </div>
       </div>
     </div>

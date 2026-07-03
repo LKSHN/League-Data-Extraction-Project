@@ -132,27 +132,8 @@ body {
   gap: 8px;
 }
 
-.filter-select {
-  background: var(--bg);
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  color: var(--text);
-  font-size: 13px;
-  padding: 4px 10px;
-  cursor: pointer;
-  outline: none;
-  transition: border-color .15s;
-}
-.filter-select:focus  { border-color: var(--gold); }
-.filter-select:disabled { opacity: .4; cursor: not-allowed; }
-.filter-select option { background: var(--panel); }
-
-/* ── League multi-select dropdown ── */
-.league-filter {
-  position: relative;
-}
-
-.league-filter-btn {
+/* ── Filter drawer buttons (Year / League) ── */
+.filter-drawer-btn {
   background: var(--bg);
   border: 1px solid var(--border);
   border-radius: 4px;
@@ -164,69 +145,113 @@ body {
   display: flex;
   align-items: center;
   gap: 6px;
-  transition: border-color .15s;
+  transition: border-color .15s, color .15s;
 }
-.league-filter-btn:hover,
-.league-filter.open .league-filter-btn { border-color: var(--gold); }
+.filter-drawer-btn:hover,
+.filter-drawer-btn.active {
+  border-color: var(--gold);
+  color: var(--gold-light);
+}
 
-.league-filter-caret {
+.filter-drawer-caret {
   color: var(--text-dim);
   font-size: 10px;
   transition: transform .15s;
 }
-.league-filter.open .league-filter-caret { transform: rotate(180deg); }
+.filter-drawer-btn.active .filter-drawer-caret { transform: rotate(180deg); }
 
-.league-filter-panel {
-  display: none;
-  position: absolute;
-  top: calc(100% + 6px);
-  left: 0;
-  z-index: 20;
-  width: 340px;
-  max-height: 360px;
-  overflow-y: auto;
+/* ── Filter drawer: slides down from under the top bar ── */
+.filter-drawer {
+  display: grid;
+  grid-template-rows: 0fr;
   background: var(--panel);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 12px;
-  box-shadow: 0 8px 24px rgba(0,0,0,.4);
+  flex-shrink: 0;
+  transition: grid-template-rows .25s ease;
 }
-.league-filter.open .league-filter-panel { display: block; }
+.filter-drawer.open {
+  grid-template-rows: 1fr;
+  border-bottom: 1px solid var(--border);
+}
 
-.league-group { margin-bottom: 10px; }
-.league-group:last-of-type { margin-bottom: 0; }
+.filter-drawer-clip { overflow: hidden; min-height: 0; }
 
-.league-group-title {
+.filter-drawer-body-wrap {
+  width: 100%;
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+.filter-drawer-body { padding: 18px 32px; }
+
+.filter-group { margin-bottom: 14px; }
+.filter-group:last-of-type { margin-bottom: 0; }
+
+.filter-group-title {
   font-size: 9px;
   font-weight: 700;
   letter-spacing: 1.2px;
   color: var(--text-dim);
-  margin-bottom: 6px;
+  margin-bottom: 8px;
   padding-bottom: 4px;
   border-bottom: 1px solid var(--border);
 }
 
-.league-option {
+.filter-options-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.filter-option {
+  position: relative;
   display: inline-flex;
   align-items: center;
-  gap: 5px;
-  width: 33.33%;
-  padding: 4px 4px;
+  gap: 6px;
+  padding: 5px 12px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 999px;
   font-size: 12px;
-  color: var(--text);
+  font-weight: 600;
+  color: var(--text-dim);
   cursor: pointer;
   user-select: none;
+  transition: background .15s, color .15s, border-color .15s;
 }
-.league-option input { accent-color: var(--gold); cursor: pointer; }
+.filter-option:hover { border-color: var(--gold); color: var(--text); }
+.filter-option:has(input:checked) {
+  background: var(--gold);
+  border-color: var(--gold);
+  color: var(--bg);
+}
+.filter-option:has(input:focus-visible) {
+  outline: 2px solid var(--gold);
+  outline-offset: 2px;
+}
+.filter-option-icon {
+  width: 16px;
+  height: 16px;
+  object-fit: contain;
+  flex-shrink: 0;
+}
+/* Native checkbox is still present (and keyboard/screen-reader
+   accessible) but visually replaced by the pill's own checked state. */
+.filter-option input[type="checkbox"] {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
 
-.league-filter-actions {
-  margin-top: 10px;
-  padding-top: 8px;
+.filter-drawer-actions {
+  margin-top: 14px;
+  padding-top: 10px;
   border-top: 1px solid var(--border);
   display: flex;
   justify-content: flex-end;
 }
-.league-filter-actions button {
+.filter-clear-btn {
   background: none;
   border: 1px solid var(--border);
   border-radius: 4px;
@@ -236,7 +261,7 @@ body {
   cursor: pointer;
   transition: color .15s, border-color .15s;
 }
-.league-filter-actions button:hover {
+.filter-clear-btn:hover {
   color: var(--gold-light);
   border-color: var(--gold);
 }
