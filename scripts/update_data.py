@@ -3,8 +3,9 @@
 # Description:
 # CI-safe daily update script.
 # Downloads the current year's CSV and refreshes only that year's
-# rows in the DB. Exits cleanly (code 0) if the download fails so
-# a Google Drive rate-limit never breaks the GitHub Actions workflow.
+# rows in the DB. Exits non-zero if the download fails (e.g. a
+# Google Drive rate-limit) so the GitHub Actions run shows as failed
+# instead of silently skipping the update.
 #
 
 import sys
@@ -35,16 +36,16 @@ def main():
         print(f'Downloading {YEAR} CSV from Google Drive...')
         file_id = _scrape_file_id(FOLDER_ID, YEAR)
         if not file_id:
-            print('Could not find file ID — skipping update.')
-            sys.exit(0)
+            print('Could not find file ID — failing so this shows up in CI.')
+            sys.exit(1)
         path = _download_single(file_id, DOWNLOADS_DIR, YEAR)
         if not path:
-            print('Download failed (rate-limited?) — skipping update.')
-            sys.exit(0)
+            print('Download failed (rate-limited?) — failing so this shows up in CI.')
+            sys.exit(1)
 
     if not os.path.exists(DB_PATH):
-        print(f'DB not found at {DB_PATH} — skipping update.')
-        sys.exit(0)
+        print(f'DB not found at {DB_PATH} — failing so this shows up in CI.')
+        sys.exit(1)
 
     update_year(DOWNLOADS_DIR, DB_PATH, YEAR, league=LEAGUE)
     print('Done.')
