@@ -44,7 +44,7 @@ def _pivot_teams(df):
     # games table has one record per match instead of two.
     blue = (
         df[df['side'] == 'Blue']
-        [['gameid', 'date', 'split', 'patch',
+        [['gameid', 'date', 'league', 'split', 'patch',
           'teamname', 'gamelength', 'result']]
         .rename(columns={
             'teamname': 'blue_team',

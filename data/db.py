@@ -44,14 +44,24 @@ def _build_where(filters):
     """Build a parameterised WHERE clause from a dict of {column: value}.
 
     Entries whose value is None are skipped, so callers can pass all possible
-    filter keys and only the non-None ones end up in the SQL.
+    filter keys and only the non-None ones end up in the SQL. A list/tuple
+    value builds an `IN (...)` clause instead of `= ?` (used for multi-league
+    selection).
 
     Returns (clause_string, params_list).
     Example: {'year': 2024, 'split': None} → (' WHERE year = ?', [2024])
     """
     conds, params = [], []
     for col, val in filters.items():
-        if val is not None:
+        if val is None:
+            continue
+        if isinstance(val, (list, tuple, set)):
+            if not val:
+                continue
+            placeholders = ','.join('?' * len(val))
+            conds.append(f'{col} IN ({placeholders})')
+            params.extend(val)
+        else:
             conds.append(f'{col} = ?')
             params.append(val)
     if not conds:
@@ -108,10 +118,10 @@ def get_years(db_path):
 
 
 def get_stats(db_path, year=None, split=None,
-              patch=None, min_games=10):
+              patch=None, leagues=None, min_games=10):
     """Return champion win-rate stats with presence (pick+ban rate)."""
     where, params = _build_where(
-        {'year': year, 'split': split, 'patch': patch}
+        {'year': year, 'split': split, 'patch': patch, 'league': leagues}
     )
     q        = f'SELECT champion, result FROM {TABLE}{where}'
     q_total  = f'SELECT COUNT(DISTINCT gameid) FROM {SUMMARIES}{where}'
@@ -156,10 +166,10 @@ def get_stats(db_path, year=None, split=None,
 
 _POS_ORDER = {'top': 0, 'jng': 1, 'mid': 2, 'bot': 3, 'sup': 4}
 
-def get_games(db_path, year=None, split=None, patch=None):
+def get_games(db_path, year=None, split=None, patch=None, leagues=None):
     """Return game results sorted newest-first with ordered champion picks."""
     where, params = _build_where(
-        {'year': year, 'split': split, 'patch': patch}
+        {'year': year, 'split': split, 'patch': patch, 'league': leagues}
     )
     q = (f'SELECT gameid, date, split, patch, blue_team, red_team,'
          f' winner, gamelength FROM {SUMMARIES}{where}'
@@ -198,26 +208,13 @@ def get_games(db_path, year=None, split=None, patch=None):
     return records
 
 
-def get_splits(db_path, year=None):
-    """Return distinct split names for a given year (or all years)."""
-    where, params = _build_where({'year': year})
-    q = (f'SELECT DISTINCT split FROM {SUMMARIES}{where}'
-         ' ORDER BY split')
+def get_leagues(db_path):
+    """Return distinct league codes present in the DB, alphabetically."""
     with sqlite3.connect(db_path) as conn:
-        df = pd.read_sql(q, conn, params=params or None)
-    return [s for s in df['split'].tolist() if pd.notna(s) and s]
-
-
-def get_patches(db_path, year=None, split=None):
-    """Return distinct patch strings for a given year/split combination."""
-    where, params = _build_where(
-        {'year': year, 'split': split}
-    )
-    q = (f'SELECT DISTINCT patch FROM {SUMMARIES}{where}'
-         ' ORDER BY patch')
-    with sqlite3.connect(db_path) as conn:
-        df = pd.read_sql(q, conn, params=params or None)
-    return [p for p in df['patch'].tolist() if pd.notna(p) and p]
+        df = pd.read_sql(
+            f'SELECT DISTINCT league FROM {TABLE} ORDER BY league', conn,
+        )
+    return [l for l in df['league'].tolist() if pd.notna(l) and l]
 
 
 def _find_year_csv(downloads_dir, year):
@@ -314,7 +311,7 @@ def get_champion_items(db_path, champion, year=None, top_n=10):
 
 
 def get_champion_avg_stats(db_path, champion,
-                           year=None, split=None, patch=None):
+                           year=None, split=None, patch=None, leagues=None):
     """Return average per-game stats for one champion.
 
     Used to populate the stats grid in the champion detail card.
@@ -323,7 +320,7 @@ def get_champion_avg_stats(db_path, champion,
     """
     where, params = _build_where(
         {'champion': champion, 'year': year,
-         'split': split, 'patch': patch}
+         'split': split, 'patch': patch, 'league': leagues}
     )
     q = f'''
         SELECT
@@ -342,7 +339,9 @@ def get_champion_avg_stats(db_path, champion,
         FROM {TABLE}{where}
     '''
     # Ban rate + Fearless-aware pick rate
-    where_b, params_b = _build_where({'year': year, 'split': split, 'patch': patch})
+    where_b, params_b = _build_where(
+        {'year': year, 'split': split, 'patch': patch, 'league': leagues}
+    )
     # Player table has champion + bans; SUMMARIES has blue_team/red_team/date
     q_picks = f'SELECT DISTINCT gameid, champion, ban1, ban2, ban3, ban4, ban5 FROM {TABLE}{where_b} ORDER BY gameid'
     q_series = f'SELECT DISTINCT gameid, date, blue_team, red_team FROM {SUMMARIES}{where_b} ORDER BY gameid'
@@ -424,7 +423,7 @@ def get_champion_avg_stats(db_path, champion,
     return result
 
 
-def get_champion_splits(db_path, champion, year=None):
+def get_champion_splits(db_path, champion, year=None, leagues=None):
     """Return per-(year, split) win-rate data for one champion.
 
     Includes ALL (year, split) buckets that exist in the window, not just
@@ -432,7 +431,7 @@ def get_champion_splits(db_path, champion, year=None):
     and win_rate=None so the chart shows 'not picked' markers.
     """
     # ── All (year, split) buckets in the window ──────────────
-    all_where, all_params = _build_where({'year': year})
+    all_where, all_params = _build_where({'year': year, 'league': leagues})
     q_all = (f'SELECT DISTINCT year, split FROM {SUMMARIES}{all_where}'
              ' ORDER BY year, split')
     with sqlite3.connect(db_path) as conn:
@@ -443,7 +442,9 @@ def get_champion_splits(db_path, champion, year=None):
     ]
 
     # ── Champion-specific rows ───────────────────────────────
-    where, params = _build_where({'champion': champion, 'year': year})
+    where, params = _build_where(
+        {'champion': champion, 'year': year, 'league': leagues}
+    )
     q = f'SELECT year, split, result FROM {TABLE}{where}'
     with sqlite3.connect(db_path) as conn:
         df = pd.read_sql(q, conn, params=params or None)
@@ -475,7 +476,7 @@ def get_champion_splits(db_path, champion, year=None):
 
 
 def get_champion_patches(db_path, champion,
-                         year=None, split=None):
+                         year=None, split=None, leagues=None):
     """Return per-patch win-rate data for one champion.
 
     Includes ALL patches that occurred in the year/split window, not just
@@ -484,7 +485,9 @@ def get_champion_patches(db_path, champion,
     marker and break the connecting line at those points.
     """
     # ── All patches in the window ────────────────────────────
-    all_where, all_params = _build_where({'year': year, 'split': split})
+    all_where, all_params = _build_where(
+        {'year': year, 'split': split, 'league': leagues}
+    )
     q_all = (f'SELECT DISTINCT patch, split, year FROM {SUMMARIES}{all_where}'
              ' ORDER BY patch')
     with sqlite3.connect(db_path) as conn:
@@ -502,7 +505,7 @@ def get_champion_patches(db_path, champion,
 
     # ── Champion-specific rows ───────────────────────────────
     where, params = _build_where(
-        {'champion': champion, 'year': year, 'split': split}
+        {'champion': champion, 'year': year, 'split': split, 'league': leagues}
     )
     q = f'SELECT patch, result FROM {TABLE}{where}'
     with sqlite3.connect(db_path) as conn:
@@ -531,10 +534,11 @@ def get_champion_patches(db_path, champion,
 
 # ── Players ───────────────────────────────────────────────────────────────────
 
-def get_players(db_path, year=None, split=None, patch=None, min_games=3):
+def get_players(db_path, year=None, split=None, patch=None,
+                leagues=None, min_games=3):
     """Return all players with aggregate stats for the current filter."""
     where, params = _build_where(
-        {'year': year, 'split': split, 'patch': patch}
+        {'year': year, 'split': split, 'patch': patch, 'league': leagues}
     )
     q = f'''
         SELECT playername, teamname, position,
@@ -564,10 +568,12 @@ def get_players(db_path, year=None, split=None, patch=None, min_games=3):
     return _records(df)
 
 
-def get_player_stats(db_path, player, year=None, split=None, patch=None):
+def get_player_stats(db_path, player, year=None, split=None,
+                      patch=None, leagues=None):
     """Return detailed aggregate stats for one player."""
     where, params = _build_where(
-        {'playername': player, 'year': year, 'split': split, 'patch': patch}
+        {'playername': player, 'year': year, 'split': split,
+         'patch': patch, 'league': leagues}
     )
     q = f'''
         SELECT
@@ -609,9 +615,12 @@ def get_player_stats(db_path, player, year=None, split=None, patch=None):
     return row
 
 
-def get_player_rankings(db_path, player, year=None, split=None, patch=None):
+def get_player_rankings(db_path, player, year=None, split=None,
+                         patch=None, leagues=None):
     """Rank the player against same-position peers for key stats."""
-    where, params = _build_where({'year': year, 'split': split, 'patch': patch})
+    where, params = _build_where(
+        {'year': year, 'split': split, 'patch': patch, 'league': leagues}
+    )
     q = f'''
         SELECT
             playername,
@@ -693,10 +702,12 @@ def get_player_split_history(db_path, player):
 
 
 def get_player_champions(db_path, player,
-                         year=None, split=None, patch=None, top_n=8):
+                         year=None, split=None, patch=None,
+                         leagues=None, top_n=8):
     """Return the player's most-played champions with stats."""
     where, params = _build_where(
-        {'playername': player, 'year': year, 'split': split, 'patch': patch}
+        {'playername': player, 'year': year, 'split': split,
+         'patch': patch, 'league': leagues}
     )
     q = f'''
         SELECT champion,
@@ -756,10 +767,11 @@ def get_player_splits(db_path, player):
 
 # ── Teams ─────────────────────────────────────────────────────────────────────
 
-def get_teams(db_path, year=None, split=None, patch=None, min_games=3):
+def get_teams(db_path, year=None, split=None, patch=None,
+              leagues=None, min_games=3):
     """Return all teams with aggregate stats."""
     where, params = _build_where(
-        {'year': year, 'split': split, 'patch': patch}
+        {'year': year, 'split': split, 'patch': patch, 'league': leagues}
     )
     q = f'''
         SELECT teamname,
@@ -778,10 +790,12 @@ def get_teams(db_path, year=None, split=None, patch=None, min_games=3):
     return _records(df)
 
 
-def get_team_stats(db_path, team, year=None, split=None, patch=None):
+def get_team_stats(db_path, team, year=None, split=None,
+                    patch=None, leagues=None):
     """Return detailed stats for one team."""
     where, params = _build_where(
-        {'teamname': team, 'year': year, 'split': split, 'patch': patch}
+        {'teamname': team, 'year': year, 'split': split,
+         'patch': patch, 'league': leagues}
     )
     q = f'''
         SELECT
@@ -811,13 +825,16 @@ def get_team_stats(db_path, team, year=None, split=None, patch=None):
     return row
 
 
-def get_team_matchups(db_path, team, year=None, split=None, patch=None):
+def get_team_matchups(db_path, team, year=None, split=None,
+                       patch=None, leagues=None):
     """Return head-to-head record vs each opponent."""
     where_b, params_b = _build_where(
-        {'blue_team': team, 'year': year, 'split': split, 'patch': patch}
+        {'blue_team': team, 'year': year, 'split': split,
+         'patch': patch, 'league': leagues}
     )
     where_r, params_r = _build_where(
-        {'red_team': team, 'year': year, 'split': split, 'patch': patch}
+        {'red_team': team, 'year': year, 'split': split,
+         'patch': patch, 'league': leagues}
     )
     q = f'''
         SELECT opponent,
@@ -843,10 +860,12 @@ def get_team_matchups(db_path, team, year=None, split=None, patch=None):
     return _records(df)
 
 
-def get_team_champions(db_path, team, year=None, split=None, patch=None, top_n=8):
+def get_team_champions(db_path, team, year=None, split=None,
+                        patch=None, leagues=None, top_n=8):
     """Return picks grouped by role and most-banned champions for a team."""
     where, params = _build_where(
-        {'teamname': team, 'year': year, 'split': split, 'patch': patch}
+        {'teamname': team, 'year': year, 'split': split,
+         'patch': patch, 'league': leagues}
     )
     q_pick = f'''
         SELECT position, champion,
@@ -889,10 +908,12 @@ def get_team_champions(db_path, team, year=None, split=None, patch=None, top_n=8
     }
 
 
-def get_team_roster(db_path, team, year=None, split=None, patch=None):
+def get_team_roster(db_path, team, year=None, split=None,
+                     patch=None, leagues=None):
     """Return roster with per-player stats, sorted by role."""
     where, params = _build_where(
-        {'teamname': team, 'year': year, 'split': split, 'patch': patch}
+        {'teamname': team, 'year': year, 'split': split,
+         'patch': patch, 'league': leagues}
     )
     q = f'''
         SELECT playername, position,
