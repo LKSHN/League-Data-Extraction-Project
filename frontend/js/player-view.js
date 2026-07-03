@@ -4,6 +4,7 @@
 const POS_LABEL = { top: 'TOP', jng: 'JNG', mid: 'MID', bot: 'BOT', sup: 'SUP' };
 
 // ── Player list table ─────────────────────────────────────
+// Sorting/filtering/rendering mechanics are shared via data-table.js.
 
 function buildPlayerRowHTML(p) {
   const wrCls = wrClass(p.win_rate);
@@ -17,17 +18,26 @@ function buildPlayerRowHTML(p) {
     + `<td class="wr ${wrCls}">${p.win_rate}%</td>`;
 }
 
+const playerTable = createSortableTable({
+  tbodyId: 'player-tbody',
+  colAttr: 'data-col-p',
+  defaultSort: { col: 'win_rate', dir: 'desc' },
+  ascCols: ['playername', 'teamname', 'position'],
+  getData: () => playerData,
+  matchesQuery: (p, q) => p.playername.toLowerCase().includes(q)
+    || (p.teamname || '').toLowerCase().includes(q),
+  buildRowHTML: buildPlayerRowHTML,
+  isSelected: p => selectedPlayer?.playername === p.playername,
+  onSelect: p => selectPlayer(p),
+});
+
 function renderPlayerTable(data) {
-  const tbody = document.getElementById('player-tbody');
-  if (!tbody) return;
-  tbody.innerHTML = '';
-  data.forEach(p => {
-    const tr = document.createElement('tr');
-    if (selectedPlayer?.playername === p.playername) tr.classList.add('selected');
-    tr.innerHTML = buildPlayerRowHTML(p);
-    tr.addEventListener('click', () => selectPlayer(p));
-    tbody.appendChild(tr);
-  });
+  playerTable.render(data);
+}
+
+function getFilteredSortedPlayers() {
+  const q = document.getElementById('player-search')?.value || '';
+  return playerTable.getFilteredSorted(q);
 }
 
 function setRoleFilter(role) {
@@ -35,42 +45,14 @@ function setRoleFilter(role) {
   document.querySelectorAll('.role-pill').forEach(btn => {
     btn.classList.toggle('active', btn.dataset.role === playerRoleFilter);
   });
+  playerTable.setExtraFilter(
+    playerRoleFilter ? (p => p.position === playerRoleFilter) : null
+  );
   renderPlayerTable(getFilteredSortedPlayers());
 }
 
-function getFilteredSortedPlayers() {
-  const q = (document.getElementById('player-search')?.value || '').toLowerCase();
-  const rows = playerData.filter(p => {
-    if (playerRoleFilter && p.position !== playerRoleFilter) return false;
-    return p.playername.toLowerCase().includes(q)
-      || (p.teamname || '').toLowerCase().includes(q);
-  });
-  rows.sort((a, b) => {
-    const av = typeof a[playerSortCol] === 'string' ? a[playerSortCol] : +a[playerSortCol];
-    const bv = typeof b[playerSortCol] === 'string' ? b[playerSortCol] : +b[playerSortCol];
-    if (av < bv) return playerSortDir === 'asc' ? -1 :  1;
-    if (av > bv) return playerSortDir === 'asc' ?  1 : -1;
-    return 0;
-  });
-  return rows;
-}
-
 function setupPlayerSortHeaders() {
-  document.querySelectorAll('thead th[data-col-p]').forEach(th => {
-    th.addEventListener('click', () => {
-      const col = th.dataset.colP;
-      playerSortDir = playerSortCol === col
-        ? (playerSortDir === 'asc' ? 'desc' : 'asc')
-        : (col === 'playername' || col === 'teamname' || col === 'position' ? 'asc' : 'desc');
-      playerSortCol = col;
-      document.querySelectorAll('thead th[data-col-p]')
-        .forEach(h => h.classList.remove('sort-asc', 'sort-desc'));
-      th.classList.add(playerSortDir === 'asc' ? 'sort-asc' : 'sort-desc');
-      renderPlayerTable(getFilteredSortedPlayers());
-    });
-  });
-  const defaultTh = document.querySelector('thead th[data-col-p="win_rate"]');
-  if (defaultTh) defaultTh.classList.add('sort-desc');
+  playerTable.setupSortHeaders(() => renderPlayerTable(getFilteredSortedPlayers()));
 }
 
 // ── Player detail card ────────────────────────────────────
@@ -279,11 +261,11 @@ async function selectPlayer(p) {
   const card = document.getElementById('player-detail-card');
   card.innerHTML = '<div class="empty">Loading…</div>';
 
-  const { year, split, patch } = getFilters();
+  const { year, split, patch, league } = getFilters();
 
   let stats;
   try {
-    const r = await fetch(buildUrl('/api/player-stats', { player: p.playername, year, split, patch }));
+    const r = await fetch(buildUrl('/api/player-stats', { player: p.playername, year, split, patch, league }));
     const body = await r.json();
     if (!r.ok) { card.innerHTML = `<div class="empty">Error ${r.status}: ${body.error || ''}</div>`; return; }
     stats = body;
@@ -308,9 +290,9 @@ async function selectPlayer(p) {
 
   const [champs, rankings, history] = await Promise.all([
     fetch(buildUrl('/api/player-champions',
-      { player: p.playername, year, split, patch })).then(r => r.json()),
+      { player: p.playername, year, split, patch, league })).then(r => r.json()),
     fetch(buildUrl('/api/player-rankings',
-      { player: p.playername, year, split, patch })).then(r => r.json()),
+      { player: p.playername, year, split, patch, league })).then(r => r.json()),
     fetch(buildUrl('/api/player-split-history',
       { player: p.playername })).then(r => r.json()),
   ]);

@@ -24,28 +24,92 @@ body {
   color: var(--text);
   font-family: 'Segoe UI', system-ui, sans-serif;
   font-size: 14px;
+}
+
+/* ── App shell (sidebar + main column) ── */
+.app-shell {
+  display: flex;
+  height: 100%;
+  width: 100%;
+}
+
+/* ── Sidebar ── */
+.sidebar {
+  width: 220px;
+  flex-shrink: 0;
+  background: var(--panel);
+  border-right: 1px solid var(--border);
   display: flex;
   flex-direction: column;
 }
 
-/* ── Header ── */
-header {
-  background: var(--panel);
-  border-bottom: 1px solid var(--border);
-  padding: 0 24px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  height: 52px;
-  flex-shrink: 0;
-}
-
-.logo {
-  font-size: 17px;
+.sidebar-logo {
+  font-size: 15px;
   font-weight: 700;
   letter-spacing: 1px;
+  line-height: 1.4;
   color: var(--gold-light);
-  white-space: nowrap;
+  padding: 20px 24px;
+  border-bottom: 1px solid var(--border);
+}
+
+.side-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 12px;
+}
+
+.side-nav button {
+  background: none;
+  border: none;
+  border-left: 3px solid transparent;
+  text-align: left;
+  color: var(--text-dim);
+  padding: 10px 13px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 13px;
+  letter-spacing: 0.5px;
+  transition: color .15s, background .15s, border-color .15s;
+}
+
+.side-nav button:hover {
+  color: var(--text);
+  background: rgba(200, 155, 60, .08);
+}
+
+.side-nav button.active {
+  color: var(--gold-light);
+  background: rgba(200, 155, 60, .15);
+  border-left-color: var(--gold);
+}
+
+/* ── Main column ── */
+.main-col {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+/* ── Page width constraint ── */
+.controls-inner,
+.main-inner {
+  width: 100%;
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+/* main no longer scrolls as a whole — each view's own scrollable
+   region (table-wrap / detail-card / series-list) scrolls independently,
+   so the header, stat tiles, and search bar stay put. */
+.main-inner {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
 }
 
 /* ── Controls bar ── */
@@ -53,11 +117,13 @@ header {
   background: var(--panel);
   border-bottom: 1px solid var(--border);
   padding: 0 32px;
+  flex-shrink: 0;
+}
+
+.controls-inner {
+  height: 48px;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  height: 48px;
-  flex-shrink: 0;
 }
 
 .filter-cascade {
@@ -81,41 +147,120 @@ header {
 .filter-select:disabled { opacity: .4; cursor: not-allowed; }
 .filter-select option { background: var(--panel); }
 
-.filter-arrow {
+/* ── League multi-select dropdown ── */
+.league-filter {
+  position: relative;
+}
+
+.league-filter-btn {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text);
+  font-size: 13px;
+  padding: 4px 10px;
+  cursor: pointer;
+  outline: none;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: border-color .15s;
+}
+.league-filter-btn:hover,
+.league-filter.open .league-filter-btn { border-color: var(--gold); }
+
+.league-filter-caret {
   color: var(--text-dim);
-  font-size: 16px;
+  font-size: 10px;
+  transition: transform .15s;
+}
+.league-filter.open .league-filter-caret { transform: rotate(180deg); }
+
+.league-filter-panel {
+  display: none;
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 20;
+  width: 340px;
+  max-height: 360px;
+  overflow-y: auto;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px;
+  box-shadow: 0 8px 24px rgba(0,0,0,.4);
+}
+.league-filter.open .league-filter-panel { display: block; }
+
+.league-group { margin-bottom: 10px; }
+.league-group:last-of-type { margin-bottom: 0; }
+
+.league-group-title {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 1.2px;
+  color: var(--text-dim);
+  margin-bottom: 6px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--border);
+}
+
+.league-option {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  width: 33.33%;
+  padding: 4px 4px;
+  font-size: 12px;
+  color: var(--text);
+  cursor: pointer;
   user-select: none;
 }
+.league-option input { accent-color: var(--gold); cursor: pointer; }
 
-nav { display: flex; gap: 4px; }
-
-nav button {
+.league-filter-actions {
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  justify-content: flex-end;
+}
+.league-filter-actions button {
   background: none;
-  border: none;
-  color: var(--text-dim);
-  padding: 6px 18px;
+  border: 1px solid var(--border);
   border-radius: 4px;
+  color: var(--text-dim);
+  font-size: 11px;
+  padding: 3px 10px;
   cursor: pointer;
-  font-size: 13px;
-  letter-spacing: 0.5px;
-  transition: color .15s, background .15s;
+  transition: color .15s, border-color .15s;
 }
-
-nav button:hover {
-  color: var(--text);
-  background: rgba(200, 155, 60, .08);
-}
-
-nav button.active {
+.league-filter-actions button:hover {
   color: var(--gold-light);
-  background: rgba(200, 155, 60, .15);
+  border-color: var(--gold);
 }
 
 /* ── Main ── */
-main { flex: 1; overflow-y: auto; padding: 28px 32px; }
+main {
+  flex: 1;
+  overflow: hidden;
+  padding: 28px 32px;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
 
-.view { display: none; }
-.view.active { display: block; }
+.view { display: none; flex-direction: column; flex: 1; min-height: 0; }
+.view.active { display: flex; }
+
+/* Games keeps the old page-level scroll instead of a boxed internal list —
+   the per-panel scroll model didn't read well against thousands of series. */
+main:has(#view-games.active) { overflow-y: auto; }
+main:has(#view-games.active) .main-inner,
+main:has(#view-games.active) #view-games {
+  min-height: auto;
+}
 
 /* ── Section title ── */
 .section-title {
@@ -125,6 +270,51 @@ main { flex: 1; overflow-y: auto; padding: 28px 32px; }
   margin-bottom: 20px;
   padding-bottom: 8px;
   border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+/* ── Stat tiles ── */
+.stat-tiles {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  margin-bottom: 20px;
+  flex-shrink: 0;
+}
+.stat-tile {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 14px 16px;
+}
+.stat-tile-value {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--gold-light);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.stat-tile-label {
+  font-size: 9px;
+  letter-spacing: 1.2px;
+  color: var(--text-dim);
+  margin-top: 6px;
+}
+.stat-tile-sub {
+  font-size: 12px;
+  color: var(--text);
+  margin-top: 3px;
+}
+.stat-tile-icon {
+  width: 20px;
+  height: 20px;
+  border-radius: 4px;
+  object-fit: cover;
+  flex-shrink: 0;
 }
 
 /* ── Champion Details ── */
@@ -132,7 +322,9 @@ main { flex: 1; overflow-y: auto; padding: 28px 32px; }
   display: grid;
   grid-template-columns: 1fr 2fr;
   gap: 20px;
-  align-items: start;
+  align-items: stretch;
+  flex: 1;
+  min-height: 0;
 }
 
 .search-bar {
@@ -146,6 +338,7 @@ main { flex: 1; overflow-y: auto; padding: 28px 32px; }
   font-size: 13px;
   outline: none;
   transition: border-color .15s;
+  flex-shrink: 0;
 }
 .search-bar:focus { border-color: var(--gold); }
 
@@ -153,12 +346,15 @@ main { flex: 1; overflow-y: auto; padding: 28px 32px; }
   background: var(--panel);
   border: 1px solid var(--border);
   border-radius: 8px;
-  overflow: hidden;
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 
 table { width: 100%; border-collapse: collapse; }
 
 thead th {
+  position: sticky;
+  top: 0;
   padding: 10px 16px;
   text-align: left;
   font-size: 12px;
@@ -225,9 +421,8 @@ td.wr.mid   { color: var(--gold); }
   border: 1px solid var(--border);
   border-radius: 8px;
   padding: 14px 16px;
-  position: sticky;
-  top: 0;
-  overflow: hidden;
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 .detail-card .empty {
   color: var(--text-dim);
@@ -491,21 +686,29 @@ td.wr.mid   { color: var(--gold); }
   border-color: var(--gold);
 }
 
-/* ── Games table ── */
-.team-col     { min-width: 140px; }
-.game-num-col { width: 48px; }
+/* ── Games: match/series cards ── */
+.series-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
 
-/* Series header row */
-tr.series-row { cursor: pointer; background: var(--panel); }
-tr.series-row:hover { background: #111d30; }
+.series-card {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+}
 
-td.series-cell { padding: 10px 16px; border-top: 1px solid var(--border); }
-
-.series-inner {
+.series-card-header {
   display: flex;
   align-items: center;
   gap: 14px;
+  padding: 14px 20px;
+  cursor: pointer;
+  transition: background .1s;
 }
+.series-card-header:hover { background: #111d30; }
 
 .series-chevron {
   font-size: 10px;
@@ -513,7 +716,7 @@ td.series-cell { padding: 10px 16px; border-top: 1px solid var(--border); }
   transition: transform 0.15s;
   flex-shrink: 0;
 }
-tr.series-row.expanded .series-chevron { transform: rotate(90deg); }
+.series-card.expanded .series-chevron { transform: rotate(90deg); }
 
 .series-date {
   font-size: 12px;
@@ -526,24 +729,29 @@ tr.series-row.expanded .series-chevron { transform: rotate(90deg); }
 .series-matchup {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 16px;
   flex: 1;
   justify-content: center;
 }
 .series-team {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   font-weight: 600;
+  font-size: 15px;
   color: var(--text);
+}
+.series-team .team-logo {
+  width: 28px;
+  height: 28px;
 }
 .series-score {
   display: flex;
   align-items: center;
-  gap: 5px;
-  font-size: 17px;
-  font-weight: 700;
-  min-width: 52px;
+  gap: 6px;
+  font-size: 20px;
+  font-weight: 800;
+  min-width: 60px;
   justify-content: center;
 }
 
@@ -558,29 +766,50 @@ tr.series-row.expanded .series-chevron { transform: rotate(90deg); }
   flex-shrink: 0;
 }
 
-/* Individual game rows */
-tr.game-row { background: var(--bg); }
-tr.game-row.hidden { display: none; }
-tr.game-row:hover { background: #0a1220; }
+/* Per-game rows, collapsed until the card header is clicked */
+.series-card-games {
+  display: none;
+  flex-direction: column;
+  border-top: 1px solid var(--border);
+  background: var(--bg);
+}
+.series-card.expanded .series-card-games { display: flex; }
 
-td.game-num {
+.game-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 10px 20px 10px 44px;
+  border-bottom: 1px solid rgba(30,45,69,.5);
+}
+.game-row:last-child { border-bottom: none; }
+.game-row:hover { background: #0a1220; }
+
+.game-num {
   color: var(--text-dim);
   font-size: 11px;
-  padding-left: 36px;
-  width: 60px;
+  width: 28px;
+  flex-shrink: 0;
 }
-td.game-dur { color: var(--text-dim); white-space: nowrap; }
+.game-dur { color: var(--text-dim); white-space: nowrap; }
 
-td.game-team  { font-weight: 600; }
-td.game-team.win  { color: var(--win); }
-td.game-team.loss { color: var(--text-dim); font-weight: 400; }
+.game-team  {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+  font-weight: 600;
+}
+.game-team.win  { color: var(--win); }
+.game-team.loss { color: var(--text-dim); font-weight: 400; }
 
-td.game-team.blue-side.win::before {
+.game-team.blue-side.win .game-team-name::before {
   content: '● ';
   color: #4a9eff;
   font-size: 10px;
 }
-td.game-team.red-side.win::before {
+.game-team.red-side.win .game-team-name::before {
   content: '● ';
   color: #ff4a4a;
   font-size: 10px;
@@ -612,6 +841,7 @@ td.game-team.red-side.win::before {
   align-items: center;
   gap: 12px;
   margin-bottom: 12px;
+  flex-shrink: 0;
 }
 .player-filter-bar .search-bar {
   margin-bottom: 0;

@@ -2,6 +2,7 @@
 // Renders the team list table and detail card.
 
 // ── Team list table ───────────────────────────────────────
+// Sorting/filtering/rendering mechanics are shared via data-table.js.
 
 function buildTeamRowHTML(t) {
   const wrCls = wrClass(t.win_rate);
@@ -11,48 +12,29 @@ function buildTeamRowHTML(t) {
     + `<td class="num">${t.avg_game_min != null ? t.avg_game_min + 'm' : '—'}</td>`;
 }
 
+const teamTable = createSortableTable({
+  tbodyId: 'team-tbody',
+  colAttr: 'data-col-t',
+  defaultSort: { col: 'win_rate', dir: 'desc' },
+  ascCols: ['teamname'],
+  getData: () => teamData,
+  matchesQuery: (t, q) => t.teamname.toLowerCase().includes(q),
+  buildRowHTML: buildTeamRowHTML,
+  isSelected: t => selectedTeam?.teamname === t.teamname,
+  onSelect: t => selectTeam(t),
+});
+
 function renderTeamTable(data) {
-  const tbody = document.getElementById('team-tbody');
-  if (!tbody) return;
-  tbody.innerHTML = '';
-  data.forEach(t => {
-    const tr = document.createElement('tr');
-    if (selectedTeam?.teamname === t.teamname) tr.classList.add('selected');
-    tr.innerHTML = buildTeamRowHTML(t);
-    tr.addEventListener('click', () => selectTeam(t));
-    tbody.appendChild(tr);
-  });
+  teamTable.render(data);
 }
 
 function getFilteredSortedTeams() {
-  const q = (document.getElementById('team-search')?.value || '').toLowerCase();
-  const rows = teamData.filter(t => t.teamname.toLowerCase().includes(q));
-  rows.sort((a, b) => {
-    const av = typeof a[teamSortCol] === 'string' ? a[teamSortCol] : +a[teamSortCol];
-    const bv = typeof b[teamSortCol] === 'string' ? b[teamSortCol] : +b[teamSortCol];
-    if (av < bv) return teamSortDir === 'asc' ? -1 :  1;
-    if (av > bv) return teamSortDir === 'asc' ?  1 : -1;
-    return 0;
-  });
-  return rows;
+  const q = document.getElementById('team-search')?.value || '';
+  return teamTable.getFilteredSorted(q);
 }
 
 function setupTeamSortHeaders() {
-  document.querySelectorAll('thead th[data-col-t]').forEach(th => {
-    th.addEventListener('click', () => {
-      const col = th.dataset.colT;
-      teamSortDir = teamSortCol === col
-        ? (teamSortDir === 'asc' ? 'desc' : 'asc')
-        : (col === 'teamname' ? 'asc' : 'desc');
-      teamSortCol = col;
-      document.querySelectorAll('thead th[data-col-t]')
-        .forEach(h => h.classList.remove('sort-asc', 'sort-desc'));
-      th.classList.add(teamSortDir === 'asc' ? 'sort-asc' : 'sort-desc');
-      renderTeamTable(getFilteredSortedTeams());
-    });
-  });
-  const defaultTh = document.querySelector('thead th[data-col-t="win_rate"]');
-  if (defaultTh) defaultTh.classList.add('sort-desc');
+  teamTable.setupSortHeaders(() => renderTeamTable(getFilteredSortedTeams()));
 }
 
 // ── Team detail card ──────────────────────────────────────
@@ -231,10 +213,10 @@ async function selectTeam(t) {
   const card = document.getElementById('team-detail-card');
   card.innerHTML = '<div class="empty">Loading…</div>';
 
-  const { year, split, patch } = getFilters();
+  const { year, split, patch, league } = getFilters();
 
   const stats = await fetch(
-    buildUrl('/api/team-stats', { team: t.teamname, year, split, patch })
+    buildUrl('/api/team-stats', { team: t.teamname, year, split, patch, league })
   ).then(r => r.json());
 
   if (!stats || !stats.games) {
@@ -251,11 +233,11 @@ async function selectTeam(t) {
 
   const [champs, matchups, roster] = await Promise.all([
     fetch(buildUrl('/api/team-champions',
-      { team: t.teamname, year, split, patch })).then(r => r.json()),
+      { team: t.teamname, year, split, patch, league })).then(r => r.json()),
     fetch(buildUrl('/api/team-matchups',
-      { team: t.teamname, year, split, patch })).then(r => r.json()),
+      { team: t.teamname, year, split, patch, league })).then(r => r.json()),
     fetch(buildUrl('/api/team-roster',
-      { team: t.teamname, year, split, patch })).then(r => r.json()),
+      { team: t.teamname, year, split, patch, league })).then(r => r.json()),
   ]);
 
   const champsEl   = document.getElementById('team-champs-placeholder');
@@ -269,9 +251,9 @@ async function selectTeam(t) {
 
 // Switch from team roster to a specific player in the Players view.
 function switchToPlayer(playerName) {
-  document.querySelectorAll('nav button').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.side-nav button').forEach(b => b.classList.remove('active'));
   document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
-  const btn = document.querySelector('nav button[data-view="view-players"]');
+  const btn = document.querySelector('.side-nav button[data-view="view-players"]');
   if (btn) btn.classList.add('active');
   document.getElementById('view-players')?.classList.add('active');
 

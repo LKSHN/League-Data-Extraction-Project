@@ -8,37 +8,44 @@
 </head>
 <body>
 
-<header>
-  <div class="logo">LEAGUE ANALYSIS</div>
-</header>
+<div class="app-shell">
 
-<div class="controls-bar">
-  <div class="filter-cascade">
-    <select id="year-select" class="filter-select">
-      <option value="">All years</option>
-    </select>
-    <span class="filter-arrow">›</span>
-    <select id="split-select" class="filter-select" disabled>
-      <option value="">All splits</option>
-    </select>
-    <span class="filter-arrow">›</span>
-    <select id="patch-select" class="filter-select" disabled>
-      <option value="">All patches</option>
-    </select>
-  </div>
-  <nav>
-    <button class="active" data-view="view-details">Champions</button>
-    <button data-view="view-players">Players</button>
-    <button data-view="view-teams">Teams</button>
-    <button data-view="view-games">Games</button>
-  </nav>
-</div>
+  <aside class="sidebar">
+    <div class="sidebar-logo">LEAGUE<br>ANALYSIS</div>
+    <nav class="side-nav">
+      <button class="active" data-view="view-games">Games</button>
+      <button data-view="view-teams">Teams</button>
+      <button data-view="view-players">Players</button>
+      <button data-view="view-details">Champions</button>
+    </nav>
+  </aside>
 
-<main>
+  <div class="main-col">
 
-  <!-- ── Champions ── -->
-  <div id="view-details" class="view active">
+    <div class="controls-bar">
+      <div class="controls-inner">
+        <div class="filter-cascade">
+          <select id="year-select" class="filter-select">
+            <option value="">All years</option>
+          </select>
+          <div class="league-filter" id="league-filter">
+            <button type="button" class="league-filter-btn" id="league-filter-btn">
+              All Leagues
+              <span class="league-filter-caret">▾</span>
+            </button>
+            <div class="league-filter-panel" id="league-filter-panel"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <main>
+    <div class="main-inner">
+
+      <!-- ── Champions ── -->
+  <div id="view-details" class="view">
     <div class="section-title">Champion Details</div>
+    <div class="stat-tiles" id="champ-stat-tiles"></div>
     <input class="search-bar" id="search" type="text"
       placeholder="Search champion…" />
     <div class="details-layout">
@@ -65,6 +72,7 @@
   <!-- ── Players ── -->
   <div id="view-players" class="view">
     <div class="section-title">Players</div>
+    <div class="stat-tiles" id="player-stat-tiles"></div>
     <div class="player-filter-bar">
       <input class="search-bar" id="player-search" type="text"
         placeholder="Search player or team…" />
@@ -102,6 +110,7 @@
   <!-- ── Teams ── -->
   <div id="view-teams" class="view">
     <div class="section-title">Teams</div>
+    <div class="stat-tiles" id="team-stat-tiles"></div>
     <input class="search-bar" id="team-search" type="text"
       placeholder="Search team…" />
     <div class="details-layout">
@@ -125,30 +134,21 @@
   </div>
 
   <!-- ── Games ── -->
-  <div id="view-games" class="view">
+  <div id="view-games" class="view active">
     <div class="section-title">Game Results</div>
+    <div class="stat-tiles" id="games-stat-tiles"></div>
     <input class="search-bar" id="game-team-search" type="text"
       placeholder="Filter by team…" />
-    <div class="table-wrap">
-      <table>
-        <thead>
-          <tr>
-            <th class="game-num-col">#</th>
-            <th class="team-col">Blue Side</th>
-            <th class="team-col">Red Side</th>
-            <th>Duration</th>
-          </tr>
-        </thead>
-        <tbody id="games-tbody">
-          <tr>
-            <td colspan="6" class="loading">Loading…</td>
-          </tr>
-        </tbody>
-      </table>
+    <div class="series-list" id="games-list">
+      <div class="loading">Loading…</div>
     </div>
-  </div>
+      </div>
 
-</main>
+    </div>
+    </main>
+
+  </div>
+</div>
 
 <script src="/js/state.js"></script>
 <script src="/js/ddragon.js"></script>
@@ -157,10 +157,12 @@
 <script src="/js/filters.js"></script>
 <script src="/js/chart.js"></script>
 <script src="/js/detail-card.js"></script>
+<script src="/js/data-table.js"></script>
 <script src="/js/champion-table.js"></script>
 <script src="/js/player-view.js"></script>
 <script src="/js/team-view.js"></script>
 <script src="/js/games.js"></script>
+<script src="/js/stat-tiles.js"></script>
 <script src="/js/main.js"></script>
 </body>
 </html>

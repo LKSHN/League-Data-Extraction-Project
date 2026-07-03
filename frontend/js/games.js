@@ -65,9 +65,9 @@ function picksHTML(champions) {
   }</div>`;
 }
 
-// ── Row builders ─────────────────────────────────────────
+// ── Card builders ────────────────────────────────────────
 
-function buildSeriesRow(s) {
+function buildSeriesHeader(s) {
   const bo    = boType(s);
   const aWins = s.winsA > s.winsB;
   const aLogo = teamImg(s.teamA, 'team-logo');
@@ -76,56 +76,70 @@ function buildSeriesRow(s) {
   const bCls  = aWins ? 'rec-l' : 'rec-w';
   const meta  = [s.split, s.patch].filter(Boolean).join(' · ');
 
-  const tr = document.createElement('tr');
-  tr.className = 'series-row';
-  tr.innerHTML = `<td colspan="4" class="series-cell">
-    <div class="series-inner">
-      <span class="series-chevron">▸</span>
-      <span class="series-date">${formatDate(s.date)}<span class="series-meta">${meta ? ' · ' + meta : ''}</span></span>
-      <span class="series-matchup">
-        <span class="series-team">${aLogo}<span>${s.teamA}</span></span>
-        <span class="series-score">
-          <span class="${aCls}">${s.winsA}</span>
-          <span class="rec-sep">–</span>
-          <span class="${bCls}">${s.winsB}</span>
-        </span>
-        <span class="series-team"><span>${s.teamB}</span>${bLogo}</span>
+  const header = document.createElement('div');
+  header.className = 'series-card-header';
+  header.innerHTML = `
+    <span class="series-chevron">▸</span>
+    <span class="series-date">${formatDate(s.date)}<span class="series-meta">${meta ? ' · ' + meta : ''}</span></span>
+    <span class="series-matchup">
+      <span class="series-team">${aLogo}<span>${s.teamA}</span></span>
+      <span class="series-score">
+        <span class="${aCls}">${s.winsA}</span>
+        <span class="rec-sep">–</span>
+        <span class="${bCls}">${s.winsB}</span>
       </span>
-      <span class="bo-badge bo-${bo.toLowerCase()}">${bo}</span>
-    </div>
-  </td>`;
-  return tr;
+      <span class="series-team"><span>${s.teamB}</span>${bLogo}</span>
+    </span>
+    <span class="bo-badge bo-${bo.toLowerCase()}">${bo}</span>
+  `;
+  return header;
 }
 
-function buildGameRows(series) {
-  return series.games.map((g, i) => {
-    const bCls = g.winner === 'blue' ? 'win' : 'loss';
-    const rCls = g.winner === 'red'  ? 'win' : 'loss';
-    const bImg = teamImg(g.blue_team, 'team-logo');
-    const rImg = teamImg(g.red_team,  'team-logo');
-    const tr   = document.createElement('tr');
-    tr.className = 'game-row hidden';
-    tr.innerHTML = `
-      <td class="game-num">G${i + 1}</td>
-      <td class="game-team blue-side ${bCls}">
-        <div class="game-team-name">${bImg}${g.blue_team || '—'}</div>
-        ${picksHTML(g.blue_picks)}
-      </td>
-      <td class="game-team red-side ${rCls}">
-        <div class="game-team-name">${rImg}${g.red_team || '—'}</div>
-        ${picksHTML(g.red_picks)}
-      </td>
-      <td class="game-dur">${formatDuration(g.gamelength)}</td>
-    `;
-    return tr;
+function buildGameRow(g, i) {
+  const bCls = g.winner === 'blue' ? 'win' : 'loss';
+  const rCls = g.winner === 'red'  ? 'win' : 'loss';
+  const bImg = teamImg(g.blue_team, 'team-logo');
+  const rImg = teamImg(g.red_team,  'team-logo');
+  const row  = document.createElement('div');
+  row.className = 'game-row';
+  row.innerHTML = `
+    <span class="game-num">G${i + 1}</span>
+    <span class="game-team blue-side ${bCls}">
+      <span class="game-team-name">${bImg}${g.blue_team || '—'}</span>
+      ${picksHTML(g.blue_picks)}
+    </span>
+    <span class="game-team red-side ${rCls}">
+      <span class="game-team-name">${rImg}${g.red_team || '—'}</span>
+      ${picksHTML(g.red_picks)}
+    </span>
+    <span class="game-dur">${formatDuration(g.gamelength)}</span>
+  `;
+  return row;
+}
+
+function buildSeriesCard(s) {
+  const card = document.createElement('div');
+  card.className = 'series-card';
+
+  const header = buildSeriesHeader(s);
+  const body   = document.createElement('div');
+  body.className = 'series-card-games';
+  s.games.forEach((g, i) => body.appendChild(buildGameRow(g, i)));
+
+  header.addEventListener('click', () => {
+    card.classList.toggle('expanded');
   });
+
+  card.appendChild(header);
+  card.appendChild(body);
+  return card;
 }
 
 // ── Render ────────────────────────────────────────────────
 
 function renderGames(games) {
-  const tbody = document.getElementById('games-tbody');
-  tbody.innerHTML = '';
+  const list = document.getElementById('games-list');
+  list.innerHTML = '';
 
   const q = getGameTeamFilter();
   const seriesList = groupBySeries(games).filter(s =>
@@ -133,20 +147,9 @@ function renderGames(games) {
   );
 
   if (!seriesList.length) {
-    tbody.innerHTML = '<tr><td colspan="4" class="loading">No results</td></tr>';
+    list.innerHTML = '<div class="loading">No results</div>';
     return;
   }
 
-  seriesList.forEach(s => {
-    const seriesRow = buildSeriesRow(s);
-    const gameRows  = buildGameRows(s);
-
-    seriesRow.addEventListener('click', () => {
-      const expanded = seriesRow.classList.toggle('expanded');
-      gameRows.forEach(r => r.classList.toggle('hidden', !expanded));
-    });
-
-    tbody.appendChild(seriesRow);
-    gameRows.forEach(r => tbody.appendChild(r));
-  });
+  seriesList.forEach(s => list.appendChild(buildSeriesCard(s)));
 }

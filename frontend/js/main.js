@@ -3,7 +3,7 @@
 // Wires up all event listeners and kicks off the initial data load.
 
 function setupNav() {
-  const btns  = document.querySelectorAll('nav button');
+  const btns  = document.querySelectorAll('.side-nav button');
   const views = document.querySelectorAll('.view');
   btns.forEach(btn => {
     btn.addEventListener('click', () => {
@@ -24,10 +24,7 @@ async function loadInfo() {
     sel.appendChild(opt);
   });
   if (info.years.length > 0) sel.value = info.years[0];
-  // Wire up the cascade: year → split → patch → reload
-  sel.addEventListener('change', () => loadSplits(+sel.value || null));
-  document.getElementById('split-select').addEventListener('change', loadPatches);
-  document.getElementById('patch-select').addEventListener('change', reloadAll);
+  sel.addEventListener('change', reloadAll);
 }
 
 document.addEventListener('DOMContentLoaded', async () => {
@@ -46,17 +43,19 @@ document.addEventListener('DOMContentLoaded', async () => {
     .addEventListener('input', () => renderGames(gamesData));
 
   await loadInfo();
-  const year = +document.getElementById('year-select').value || null;
-  // loadSplits triggers reloadAll internally, so no separate data fetch needed.
-  await loadSplits(year);
+  await loadLeagues();
+  reloadAll();
 
   // Icons load asynchronously and re-render once ready without blocking data.
   loadDDragon().then(() => {
     renderTable(getFilteredSorted());
     renderPlayerTable(getFilteredSortedPlayers());
+    renderChampStatTiles();
   });
   loadTeamLogos().then(() => {
     renderGames(gamesData);
     renderTeamTable(getFilteredSortedTeams());
+    renderGamesStatTiles();
+    renderTeamStatTiles();
   });
 });

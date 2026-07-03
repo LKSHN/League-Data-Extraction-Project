@@ -131,11 +131,11 @@ async function selectChamp(d) {
     if (fill) fill.style.width = d.win_rate + '%';
   }, 20);
 
-  const { year, split, patch } = getFilters();
+  const { year, split, patch, league } = getFilters();
 
   // Fetch average stats and render the stats grid.
   const statsUrl = buildUrl('/api/champion-stats',
-    { champion: d.champion, year, split, patch });
+    { champion: d.champion, year, split, patch, league });
   const stats = await fetch(statsUrl).then(r => r.json());
   const grid = document.getElementById('stats-grid');
   if (grid) grid.innerHTML = buildStatsGrid(stats);
@@ -180,16 +180,16 @@ async function selectChamp(d) {
   // Read zoom from the global, but also check the DOM dataset as a fallback.
   const wrap = document.querySelector('.patch-chart-wrap');
   const activeZoom = (wrap && wrap.dataset.zoom) || chartZoom || 'patch';
-  await _renderChartForZoom(d.champion, year, split, activeZoom);
+  await _renderChartForZoom(d.champion, year, split, league, activeZoom);
 }
 
 // Fetches the correct data endpoint for the given mode and injects the chart.
 // mode is passed explicitly — never read from the global to avoid scoping issues.
-async function _renderChartForZoom(champion, year, split, mode) {
+async function _renderChartForZoom(champion, year, split, league, mode) {
   const endpoint = mode === 'split'
     ? '/api/champion-splits'
     : '/api/champion-patches';
-  const url = buildUrl(endpoint, { champion, year, split });
+  const url = buildUrl(endpoint, { champion, year, split, league });
   const data = await fetch(url).then(r => r.json());
   const chart = document.getElementById('patch-chart');
   if (!chart) return;
@@ -214,6 +214,6 @@ async function setChartZoom(mode) {
   const wrap = document.querySelector('.patch-chart-wrap');
   if (wrap) wrap.dataset.zoom = mode;
 
-  const { year, split } = getFilters();
-  await _renderChartForZoom(selectedChamp.champion, year, split, mode);
+  const { year, split, league } = getFilters();
+  await _renderChartForZoom(selectedChamp.champion, year, split, league, mode);
 }
