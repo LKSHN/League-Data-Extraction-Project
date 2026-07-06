@@ -138,7 +138,10 @@ python main.py
 
 On first run:
 1. The app checks `downloads/` for a CSV matching the current year.
-2. If none is found it attempts an automated download from Google Drive.
+2. If none is found it attempts an automated download from Google Drive —
+   via the Drive API if `GOOGLE_DRIVE_API_KEY` is set (see
+   [Configuration](#configuration)), otherwise by scraping the folder page.
+   Transient failures are retried with backoff before falling back.
 3. If Google Drive rate-limits the download, a browser window opens with the
    direct link — download the file manually and place it in `downloads/`, then
    re-run.
@@ -160,6 +163,11 @@ Edit `server/config.py` to change behaviour:
 | `YEAR` | auto | Current year — controls which CSV is auto-downloaded |
 | `FOLDER_ID` | OE folder | Google Drive folder ID for Oracle's Elixir data |
 | `DOWNLOADS_DIR` | `'downloads'` | Local directory for CSVs and the DB |
+
+Set `GOOGLE_DRIVE_API_KEY` in `.env` (see `.env.example`) to download via the
+Drive API v3 instead of scraping the folder page — a free Google Cloud API
+key with the Drive API enabled, using a separate quota from the anonymous
+web-download page that Google Drive rate-limits.
 
 ---
 

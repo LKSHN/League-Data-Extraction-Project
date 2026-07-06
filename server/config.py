@@ -7,6 +7,7 @@
 # port, or data paths without touching application code.
 #
 
+import os
 from datetime import datetime
 
 PORT          = 5000                                    # Flask dev server port
@@ -15,3 +16,4 @@ YEAR          = datetime.now().year                     # auto-detected; used fo
 LEAGUE        = ''                                      # row filter on the 'league' column; '' = all leagues
 DOWNLOADS_DIR = 'downloads'                             # local cache for CSVs; DB lives here too
 DB_PATH       = 'downloads/league_data.db'              # SQLite file rebuilt from CSVs on every startup
+DRIVE_API_KEY = os.environ.get('GOOGLE_DRIVE_API_KEY', '')  # optional; enables the Drive API download path

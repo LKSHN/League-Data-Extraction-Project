@@ -18,11 +18,9 @@ from dotenv import load_dotenv
 load_dotenv()
 
 from server.config import (
-    FOLDER_ID, YEAR, DOWNLOADS_DIR, DB_PATH, LEAGUE,
+    FOLDER_ID, YEAR, DOWNLOADS_DIR, DB_PATH, LEAGUE, DRIVE_API_KEY,
 )
-from data.downloader import (
-    _find_local, _scrape_file_id, _download_single,
-)
+from data.downloader import _find_local, find_file_id, download_file
 from data.db import update_year
 
 
@@ -34,11 +32,11 @@ def main():
         print(f'CSV for {YEAR} already present, refreshing DB...')
     else:
         print(f'Downloading {YEAR} CSV from Google Drive...')
-        file_id = _scrape_file_id(FOLDER_ID, YEAR)
+        file_id, via_api = find_file_id(FOLDER_ID, YEAR, DRIVE_API_KEY)
         if not file_id:
             print('Could not find file ID — failing so this shows up in CI.')
             sys.exit(1)
-        path = _download_single(file_id, DOWNLOADS_DIR, YEAR)
+        path = download_file(file_id, DOWNLOADS_DIR, YEAR, via_api, DRIVE_API_KEY)
         if not path:
             print('Download failed (rate-limited?) — failing so this shows up in CI.')
             sys.exit(1)
